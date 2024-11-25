@@ -1,0 +1,34 @@
+#!/bin/sh
+
+# Pre-commit hook to prevent committing sensitive files
+
+# Check for .env files
+if git diff --cached --name-only | grep -q "\.env$"; then
+    echo "❌ Error: Attempting to commit .env file"
+    echo "Remove it with: git rm --cached .env"
+    exit 1
+fi
+
+# Check for specific sensitive files
+SENSITIVE_PATTERNS=("\.env$" "firebase.*\.json$" "service-account.*\.json$")
+
+for pattern in "${SENSITIVE_PATTERNS[@]}"; do
+    if git diff --cached --name-only | grep -q "$pattern"; then
+        echo "❌ Error: Attempting to commit sensitive file matching pattern: $pattern"
+        echo "Remove it with: git rm --cached <filename>"
+        exit 1
+    fi
+done
+
+# Check for potential API keys or secrets in code
+if git diff --cached | grep -i "api[_-]*key\|secret\|password\|token" > /dev/null; then
+    echo "⚠️  Warning: Possible API key or secret detected in changes"
+    echo "Please verify you're not committing sensitive information"
+    read -p "Do you want to proceed with commit? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+fi
+
+exit 0
