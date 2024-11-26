@@ -86,7 +86,7 @@ router.use("/orders", orderRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/suppliers", supplierRoutes);
 router.use("/users", userRoutes);
-router.use('/api/checkout', checkoutRoutes);
+router.use('/checkout', checkoutRoutes);
 
 // Development routes
 if (process.env.NODE_ENV === 'development') {
