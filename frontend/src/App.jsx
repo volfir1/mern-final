@@ -48,7 +48,7 @@ const queryClient = new QueryClient({
       onError: (error) => {
         if (error?.response?.status === 401) {
           sessionStorage.clear();
-          window.location.href = "/login";
+          window.location.href = "/homepage";
         }
       },
     },
