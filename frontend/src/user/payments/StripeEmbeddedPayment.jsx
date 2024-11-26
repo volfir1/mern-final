@@ -1,17 +1,33 @@
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, Button, Box, Typography, CircularProgress } from '@mui/material';
+import { useState, useEffect, useCallback } from 'react';
+import { Dialog, DialogContent, Button, Box, Typography, CircularProgress, Alert } from '@mui/material';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { TokenManager } from '@/utils/tokenManager';
 
 // Initialize stripe outside component to avoid recreating
 let stripePromise = null;
 
-// Function to get stripe public key and initialize stripe
+// Function to get stripe public key and initialize stripe with error handling
 const getStripePromise = async () => {
   if (!stripePromise) {
-    const response = await fetch('/api/checkout/config');
-    const { publicKey } = await response.json();
-    stripePromise = loadStripe(publicKey);
+    try {
+      const token = await TokenManager.getToken(true);
+      const response = await fetch('/api/checkout/config', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch Stripe configuration');
+      }
+      
+      const { publicKey } = await response.json();
+      stripePromise = loadStripe(publicKey);
+    } catch (error) {
+      console.error('Error initializing Stripe:', error);
+      throw error;
+    }
   }
   return stripePromise;
 };
@@ -24,16 +40,20 @@ const CheckoutForm = ({ amount, orderId, onSuccess, onError }) => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setErrorMessage('');
-
-    if (!stripe || !elements) {
+    
+    if (!stripe || !elements || loading) {
       return;
     }
 
-    setLoading(true);
-
     try {
-      const { error, paymentIntent } = await stripe.confirmPayment({
+      setLoading(true);
+      setErrorMessage('');
+
+      // Get fresh token
+      const token = await TokenManager.getToken(true);
+
+      // Confirm the payment
+      const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
           return_url: `${window.location.origin}/payment-complete`,
@@ -41,15 +61,17 @@ const CheckoutForm = ({ amount, orderId, onSuccess, onError }) => {
         redirect: 'if_required',
       });
 
-      if (error) {
-        setErrorMessage(error.message);
-        onError(error.message);
-      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+      if (confirmError) {
+        throw new Error(confirmError.message);
+      }
+
+      if (paymentIntent.status === 'succeeded') {
         // Confirm payment with backend
         const confirmResponse = await fetch('/api/checkout/confirm-payment', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
             paymentIntentId: paymentIntent.id,
@@ -57,13 +79,19 @@ const CheckoutForm = ({ amount, orderId, onSuccess, onError }) => {
           }),
         });
 
+        if (!confirmResponse.ok) {
+          throw new Error('Failed to confirm payment with server');
+        }
+
         const confirmResult = await confirmResponse.json();
         
         if (confirmResult.success) {
           onSuccess(paymentIntent);
         } else {
-          throw new Error(confirmResult.message);
+          throw new Error(confirmResult.message || 'Payment confirmation failed');
         }
+      } else {
+        throw new Error('Payment was not completed successfully');
       }
     } catch (err) {
       console.error('Payment error:', err);
@@ -75,18 +103,21 @@ const CheckoutForm = ({ amount, orderId, onSuccess, onError }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="space-y-4">
       <PaymentElement />
       
       {errorMessage && (
-        <Typography color="error" className="mt-2 text-sm">
+        <Alert severity="error" className="mt-4">
           {errorMessage}
-        </Typography>
+        </Alert>
       )}
 
-      <Box className="mt-4">
-        <Typography variant="body1" className="mb-2">
-          Amount to Pay: ₱{amount?.toFixed(2)}
+      <Box className="mt-4 bg-gray-50 p-4 rounded-lg">
+        <Typography variant="h6" className="font-medium text-gray-900">
+          Payment Summary
+        </Typography>
+        <Typography variant="body1" className="text-gray-600">
+          Amount to Pay: ₱{amount?.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
         </Typography>
       </Box>
 
@@ -95,30 +126,55 @@ const CheckoutForm = ({ amount, orderId, onSuccess, onError }) => {
         fullWidth
         variant="contained"
         disabled={!stripe || loading}
-        className="bg-blue-600 hover:bg-blue-700 mt-4"
+        className="bg-blue-600 hover:bg-blue-700 mt-4 py-3"
       >
-        {loading ? <CircularProgress size={24} /> : 'Pay Now'}
+        {loading ? (
+          <Box className="flex items-center justify-center">
+            <CircularProgress size={20} className="mr-2" />
+            Processing...
+          </Box>
+        ) : (
+          'Pay Now'
+        )}
       </Button>
     </form>
   );
 };
 
 const StripePayment = ({ open, onClose, onSuccess, onError, amount, orderId }) => {
-  const [clientSecret, setClientSecret] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [state, setState] = useState({
+    clientSecret: null,
+    loading: true,
+    error: null,
+    stripe: null
+  });
+
+  const updateState = useCallback((updates) => {
+    setState(prev => ({ ...prev, ...updates }));
+  }, []);
 
   useEffect(() => {
+    let mounted = true;
+
     const initializePayment = async () => {
+      if (!open || !amount || !orderId) return;
+
       try {
-        setLoading(true);
-        setError(null);
+        updateState({ loading: true, error: null });
+
+        // Initialize Stripe first
+        const stripe = await getStripePromise();
+        if (!mounted) return;
+
+        // Get fresh token
+        const token = await TokenManager.getToken(true);
 
         // Create payment intent
         const response = await fetch('/api/checkout/create-payment-intent', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
             amount: amount,
@@ -126,74 +182,104 @@ const StripePayment = ({ open, onClose, onSuccess, onError, amount, orderId }) =
           }),
         });
 
+        if (!mounted) return;
+
+        if (!response.ok) {
+          throw new Error('Failed to create payment intent');
+        }
+
         const data = await response.json();
 
         if (!data.success) {
           throw new Error(data.message || 'Could not initialize payment');
         }
 
-        setClientSecret(data.clientSecret);
+        updateState({
+          clientSecret: data.clientSecret,
+          stripe: stripe,
+          loading: false
+        });
       } catch (err) {
         console.error('Payment initialization error:', err);
-        setError(err.message || 'Could not initialize payment');
-        onError?.(err.message || 'Payment initialization failed');
-      } finally {
-        setLoading(false);
+        if (mounted) {
+          updateState({
+            error: err.message || 'Could not initialize payment',
+            loading: false
+          });
+          onError?.(err.message || 'Payment initialization failed');
+        }
       }
     };
 
-    if (open && amount && orderId) {
-      initializePayment();
-    }
-  }, [open, amount, orderId]);
+    initializePayment();
+
+    return () => {
+      mounted = false;
+    };
+  }, [open, amount, orderId, updateState, onError]);
+
+  const { clientSecret, loading, error, stripe } = state;
 
   return (
     <Dialog 
       open={open} 
-      onClose={onClose}
-      maxWidth="md"
+      onClose={() => !loading && onClose()}
+      maxWidth="sm"
       fullWidth
+      PaperProps={{
+        className: "rounded-lg"
+      }}
     >
-      <DialogContent>
-        <Box className="p-4">
-          <Typography variant="h6" className="mb-4">
-            Credit Card Payment
-          </Typography>
-          
-          {loading && (
-            <Box className="flex justify-center p-4">
-              <CircularProgress />
-            </Box>
-          )}
-
-          {error && (
-            <Typography color="error" className="mb-4">
-              {error}
+      <DialogContent className="p-6">
+        <Typography variant="h5" component="h2" className="font-bold mb-6">
+          Credit Card Payment
+        </Typography>
+        
+        {loading && (
+          <Box className="flex flex-col items-center justify-center py-8">
+            <CircularProgress />
+            <Typography className="mt-4 text-gray-600">
+              Initializing payment...
             </Typography>
-          )}
-          
-          {!loading && !error && clientSecret && (
-            <Elements 
-              stripe={stripePromise} 
-              options={{
-                clientSecret,
-                appearance: {
-                  theme: 'stripe',
-                  variables: {
-                    colorPrimary: '#2563eb',
-                  },
+          </Box>
+        )}
+
+        {error && (
+          <Alert 
+            severity="error" 
+            className="mb-4"
+            action={
+              <Button color="inherit" size="small" onClick={onClose}>
+                Close
+              </Button>
+            }
+          >
+            {error}
+          </Alert>
+        )}
+        
+        {!loading && !error && clientSecret && stripe && (
+          <Elements 
+            stripe={stripe}
+            options={{
+              clientSecret,
+              appearance: {
+                theme: 'stripe',
+                variables: {
+                  colorPrimary: '#2563eb',
+                  borderRadius: '8px',
                 },
-              }}
-            >
-              <CheckoutForm 
-                amount={amount} 
-                orderId={orderId}
-                onSuccess={onSuccess}
-                onError={onError}
-              />
-            </Elements>
-          )}
-        </Box>
+              },
+            }}
+          >
+            <CheckoutForm 
+              amount={amount} 
+              orderId={orderId}
+              onSuccess={onSuccess}
+              onError={onError}
+            />
+          </Elements>
+        )}
       </DialogContent>
     </Dialog>
   );

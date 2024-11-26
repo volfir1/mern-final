@@ -3,7 +3,12 @@ import api from '@/utils/api';
 import { getAuth } from 'firebase/auth';
 import { firebaseApp } from '@/config/firebase.config';
 
-const CART_BASE_URL = '/cart';
+// API endpoints
+const API_CART_URL = '/cart';
+const API_CHECKOUT_URL = '/checkout';
+const API_PAYMENTS_URL = '/payments';
+const FRONTEND_CHECKOUT_URL = '/user/checkout';
+
 const auth = getAuth(firebaseApp);
 
 const ensureToken = async () => {
@@ -11,6 +16,7 @@ const ensureToken = async () => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
       console.error('No user found');
+      window.location.href = `/login?redirect=${FRONTEND_CHECKOUT_URL}`;
       throw new Error('User not authenticated');
     }
     
@@ -20,6 +26,7 @@ const ensureToken = async () => {
       throw new Error('Failed to get authentication token');
     }
     
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     return token;
   } catch (error) {
     console.error('Auth error:', error);
@@ -28,110 +35,235 @@ const ensureToken = async () => {
 };
 
 export const cartApi = {
+  // Existing cart operations...
   getCart: async () => {
     try {
-      await ensureToken(); // Verify token before request
-      const response = await api.get(CART_BASE_URL);
+      await ensureToken();
+      const response = await api.get(API_CART_URL);
       console.log('Got cart:', response.data);
       return response.data;
     } catch (error) {
+      if (error.response?.status === 401) {
+        window.location.href = `/login?redirect=${FRONTEND_CHECKOUT_URL}`;
+      }
       console.error('Get cart error:', error.response?.data || error);
       throw error.response?.data || error;
     }
   },
 
-  addToCart: async (productId, quantity = 1) => {
+  // Checkout operations
+
+  initiateCheckout: async (data) => {
     try {
-      console.log('Adding to cart:', { productId, quantity });
-      await ensureToken(); // Verify token before request
-
-      const response = await api.post(CART_BASE_URL, {
-        productId: productId.toString(),
-        quantity: Math.max(1, parseInt(quantity))
-      });
-
-      console.log('Add to cart response:', response.data);
-      window.dispatchEvent(new CustomEvent('cart-updated'));
-      return response.data;
-    } catch (error) {
-      console.error('Add to cart error:', {
-        message: error.response?.data?.message || error.message,
-        status: error.response?.status,
-        data: error.response?.data
-      });
-      throw error.response?.data || error;
-    }
-  },
-
-  updateCartItem: async (productId, quantity) => {
-    try {
-      console.log('Starting cart item update:', { productId, quantity });
-      await ensureToken(); // Verify token before request
-
-      const url = `${CART_BASE_URL}/items/${productId.toString()}`;
-      console.log('Updating cart at URL:', url);
-
-      const response = await api.put(url, {
-        quantity: parseInt(quantity)
-      });
-
-      console.log('Cart update response:', response.data);
-      window.dispatchEvent(new CustomEvent('cart-updated'));
-      return response.data;
-    } catch (error) {
-      console.error('Update cart error:', {
-        message: error.response?.data?.message || error.message,
-        status: error.response?.status,
-        data: error.response?.data
-      });
-      throw error.response?.data || error;
-    }
-  },
-
-  removeCartItem: async (productId) => {
-    try {
-      console.log('Starting cart item removal:', productId);
-      await ensureToken(); // Verify token before request
-
-      const url = `${CART_BASE_URL}/items/${productId.toString()}`;
-      console.log('Removing cart item at URL:', url);
-
-      const response = await api.delete(url);
+      await ensureToken();
+      const response = await api.post(API_CHECKOUT_URL, data);
       
-      console.log('Remove item response:', response.data);
-      window.dispatchEvent(new CustomEvent('cart-updated'));
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Checkout failed');
+      }
+      
+      if (!response.data.data?._id) {
+        throw new Error('No order ID received from server');
+      }
+      
       return response.data;
     } catch (error) {
-      console.error('Remove item error:', {
-        message: error.response?.data?.message || error.message,
-        status: error.response?.status,
-        data: error.response?.data
-      });
+      console.error('Checkout initiation error:', error);
+      if (error.response?.status === 401) {
+        window.location.href = `/login?redirect=${FRONTEND_CHECKOUT_URL}`;
+      }
       throw error.response?.data || error;
     }
   },
 
-  clearCart: async () => {
+  getCheckoutStatus: async (orderId) => {
     try {
-      await ensureToken(); // Verify token before request
-      const response = await api.delete(`${CART_BASE_URL}/clear`);
-      
-      console.log('Clear cart response:', response.data);
-      window.dispatchEvent(new CustomEvent('cart-updated'));
+      await ensureToken();
+      const response = await api.get(`${API_CHECKOUT_URL}/${orderId}/status`);
       return response.data;
     } catch (error) {
-      console.error('Clear cart error:', {
-        message: error.response?.data?.message || error.message,
-        status: error.response?.status,
-        data: error.response?.data
-      });
+      console.error('Get checkout status error:', error);
       throw error.response?.data || error;
     }
-  }
-};
+  },
 
-export const emitCartUpdate = () => {
-  window.dispatchEvent(new CustomEvent('cart-updated'));
-};
+  confirmCheckout: async (orderId) => {
+    try {
+      if (!orderId) {
+        throw new Error('Order ID is required for confirmation');
+      }
+      
+      await ensureToken();
+      const response = await api.post(`${API_CHECKOUT_URL}/${orderId}/confirm`);
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to confirm checkout');
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Confirm checkout error:', error);
+      throw error.response?.data || error;
+    }
+  },
 
-export default cartApi;
+  cancelCheckout: async (orderId) => {
+    try {
+      await ensureToken();
+      const response = await api.post(`${API_CHECKOUT_URL}/${orderId}/cancel`);
+      return response.data;
+    } catch (error) {
+      console.error('Cancel checkout error:', error);
+      throw error.response?.data || error;
+    }
+  },
+
+  // Payment operations
+  createPaymentIntent: async (data) => {
+    try {
+      await ensureToken();
+      const response = await api.post(`${API_CHECKOUT_URL}/create-payment-intent`, data);
+      return response.data;
+    } catch (// src/utils/cartApi.js (continued...)
+      error) {
+        console.error('Create payment intent error:', error);
+        throw error.response?.data || error;
+      }
+    },
+  
+    confirmPayment: async (data) => {
+      try {
+        await ensureToken();
+        const response = await api.post(`${API_CHECKOUT_URL}/confirm-payment`, data);
+        return response.data;
+      } catch (error) {
+        console.error('Confirm payment error:', error);
+        throw error.response?.data || error;
+      }
+    },
+  
+    // Get Stripe public key
+    getStripeConfig: async () => {
+      try {
+        await ensureToken();
+        const response = await api.get(`${API_CHECKOUT_URL}/config`);
+        return response.data;
+      } catch (error) {
+        console.error('Get Stripe config error:', error);
+        throw error.response?.data || error;
+      }
+    },
+  
+    // Process order specific operations
+    getOrder: async (orderId) => {
+      try {
+        await ensureToken();
+        const response = await api.get(`/orders/${orderId}`);
+        return response.data;
+      } catch (error) {
+        console.error('Get order error:', error);
+        throw error.response?.data || error;
+      }
+    },
+  
+    getAllOrders: async () => {
+      try {
+        await ensureToken();
+        const response = await api.get('/orders');
+        return response.data;
+      } catch (error) {
+        console.error('Get all orders error:', error);
+        throw error.response?.data || error;
+      }
+    },
+  
+    updateOrderStatus: async (orderId, status) => {
+      try {
+        await ensureToken();
+        const response = await api.patch(`/orders/${orderId}/status`, { status });
+        return response.data;
+      } catch (error) {
+        console.error('Update order status error:', error);
+        throw error.response?.data || error;
+      }
+    },
+  
+    // Cart manipulation methods
+    addToCart: async (productId, quantity = 1) => {
+      try {
+        await ensureToken();
+        const response = await api.post(API_CART_URL, { 
+          productId, 
+          quantity 
+        });
+        return response.data;
+      } catch (error) {
+        console.error('Add to cart error:', error);
+        throw error.response?.data || error;
+      }
+    },
+  
+    updateCartItem: async (productId, quantity) => {
+      try {
+        await ensureToken();
+        const response = await api.put(`${API_CART_URL}/items/${productId}`, { 
+          quantity 
+        });
+        return response.data;
+      } catch (error) {
+        console.error('Update cart item error:', error);
+        throw error.response?.data || error;
+      }
+    },
+  
+    removeFromCart: async (productId) => {
+      try {
+        await ensureToken();
+        const response = await api.delete(`${API_CART_URL}/items/${productId}`);
+        return response.data;
+      } catch (error) {
+        console.error('Remove from cart error:', error);
+        throw error.response?.data || error;
+      }
+    },
+  
+    clearCart: async () => {
+      try {
+        await ensureToken();
+        const response = await api.delete(`${API_CART_URL}/clear`);
+        return response.data;
+      } catch (error) {
+        console.error('Clear cart error:', error);
+        throw error.response?.data || error;
+      }
+    }
+  };
+  
+  // Event emitter for cart updates
+  export const emitCartUpdate = () => {
+    window.dispatchEvent(new CustomEvent('cart-updated'));
+  };
+  
+  // Helper function to handle payment redirect
+  export const handlePaymentRedirect = async (orderId) => {
+    try {
+      await ensureToken();
+      const orderStatus = await cartApi.getCheckoutStatus(orderId);
+      
+      if (orderStatus.status === 'success') {
+        return { success: true, order: orderStatus.order };
+      } else if (orderStatus.status === 'pending') {
+        return { success: false, message: 'Payment is still processing' };
+      } else {
+        return { success: false, message: orderStatus.message || 'Payment failed' };
+      }
+    } catch (error) {
+      console.error('Payment redirect error:', error);
+      return { 
+        success: false, 
+        message: error.response?.data?.message || 'Failed to process payment' 
+      };
+    }
+  };
+  
+  export default cartApi;

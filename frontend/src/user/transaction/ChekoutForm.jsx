@@ -1,202 +1,243 @@
-// components/Checkout/CheckoutForm.jsx
-import { useState } from 'react';
-import { Formik, Form } from 'formik';
-import * as Yup from 'yup';
-import {
-  TextField,
-  Button,
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
   Box,
   Typography,
   Paper,
   Grid,
   Divider,
   FormControl,
-  FormHelperText,
   InputLabel,
   Select,
   MenuItem,
-  Alert
+  Button,
+  Alert,
+  CircularProgress,
 } from '@mui/material';
 import {
-  CreditCard as CreditCardIcon,
+  ShoppingCart as CartIcon,
   LocalShipping as ShippingIcon,
+  CreditCard as PaymentIcon,
   AttachMoney as CashIcon,
-  ShoppingCart as CartIcon
+  Home as HomeIcon,
+  LocationOn,
+  Work
 } from '@mui/icons-material';
-import StripeEmbeddedPayment from '../payments/StripeEmbeddedPayment';
+import { toast } from 'react-hot-toast';
+import api from "@/utils/api";
 
-const CheckoutValidationSchema = Yup.object().shape({
-  shippingAddressId: Yup.string()
-    .required('Please select a shipping address'),
-  paymentMethod: Yup.string()
-    .required('Please select a payment method')
-    .oneOf(['STRIPE', 'COD'], 'Invalid payment method'),
-});
+const CheckoutForm = ({ cartItems = [] }) => {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [profile, setProfile] = useState({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    image: { url: '' },
+    primaryAddress: null,
+    additionalAddresses: []
+  });
+  
+  // Initialize with defaults
+  const [selectedAddressId, setSelectedAddressId] = useState('');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('COD');
 
-const CheckoutForm = ({ addresses, cartItems }) => {
-  const [showStripePayment, setShowStripePayment] = useState(false);
-  const [paymentComplete, setPaymentComplete] = useState(false);
-  const [clientSecret, setClientSecret] = useState(null);
+  // Fetch Profile Data
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await api.get('/profile/me');
+        if (response.data.success) {
+          setProfile(response.data.profile);
+          // Set default selected address to primary address if it exists
+          if (response.data.profile.primaryAddress) {
+            setSelectedAddressId(response.data.profile.primaryAddress._id);
+          }
+        }
+      } catch (err) {
+        console.error('Profile fetch error:', err);
+        setError('Failed to load profile');
+      }
+    };
+    fetchProfile();
+  }, []);
 
-  const cartTotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-
-  const handlePaymentSuccess = (secret) => {
-    setClientSecret(secret);
-    setPaymentComplete(true);
-    setShowStripePayment(false);
-  };
-
-  const handleSubmit = async (values, { setSubmitting }) => {
-    if (values.paymentMethod === 'STRIPE' && !paymentComplete) {
-      setShowStripePayment(true);
-      setSubmitting(false);
-      return;
-    }
-
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    
     try {
-      // Submit order with payment details
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...values,
-          stripeClientSecret: clientSecret
-        }),
+      console.log('Submitting with data:', {
+        shippingAddressId: selectedAddressId,
+        paymentMethod: selectedPaymentMethod
       });
 
-      const data = await response.json();
-      if (data.success) {
-        // Handle success (redirect to confirmation page)
+      // Step 1: Create order with required fields
+      const orderResponse = await api.post('/checkout', {
+        shippingAddressId: selectedAddressId,
+        paymentMethod: selectedPaymentMethod
+      });
+      
+      if (orderResponse.data.success) {
+        // Extract the order ID from the response
+        const orderId = orderResponse.data.data._id; // Make sure this matches your API response structure
+        console.log('Order created with ID:', orderId);
+        
+        if (!orderId) {
+          throw new Error('No order ID received from server');
+        }
+        
+        // Step 2: Confirm the order with the orderId
+        const confirmResponse = await api.post(`/checkout/${orderId}/confirm`);
+        
+        if (confirmResponse.data.success) {
+          // Step 3: Clear cart
+          await api.delete('/cart/clear');
+          
+          toast.success('Order placed successfully! 🎉');
+          
+          // Step 4: Redirect after a brief delay
+          setTimeout(() => {
+            navigate('/user/orders');
+          }, 1500);
+        } else {
+          throw new Error(confirmResponse.data.message || 'Failed to confirm order');
+        }
+      } else {
+        throw new Error(orderResponse.data.message || 'Failed to create order');
       }
-    } catch (error) {
-      console.error('Checkout error:', error);
+    } catch (err) {
+      console.error('Order submission error:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to place order';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
+  // Combine addresses for select menu
+  const allAddresses = [
+    ...(profile.primaryAddress ? [profile.primaryAddress] : []),
+    ...profile.additionalAddresses
+  ];
+
+  const getAddressIcon = (label) => {
+    switch (label) {
+      case 'Home':
+        return <HomeIcon />;
+      case 'Work':
+        return <Work />;
+      default:
+        return <LocationOn />;
+    }
+  };
+
+  // Calculate cart total
+  const cartTotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 450.00;
+
+  // Rest of the JSX remains the same...
   return (
-    <Box className="max-w-7xl mx-auto px-4 py-8">
+    <Box className="max-w-4xl mx-auto p-4">
       <Grid container spacing={4}>
         {/* Left Column - Form */}
         <Grid item xs={12} md={8}>
-          <Formik
-            initialValues={{
-              shippingAddressId: '',
-              paymentMethod: ''
-            }}
-            validationSchema={CheckoutValidationSchema}
-            onSubmit={handleSubmit}
-          >
-            {({
-              values,
-              errors,
-              touched,
-              handleChange,
-              handleBlur,
-              isSubmitting
-            }) => (
-              <Form>
-                <Paper className="p-6 space-y-6">
-                  {/* Shipping Section */}
-                  <Box>
-                    <Typography variant="h6" className="flex items-center gap-2 mb-4">
-                      <ShippingIcon /> Shipping Address
-                    </Typography>
-                    
-                    <FormControl 
-                      fullWidth 
-                      error={touched.shippingAddressId && Boolean(errors.shippingAddressId)}
-                    >
-                      <InputLabel>Select Address</InputLabel>
-                      <Select
-                        name="shippingAddressId"
-                        value={values.shippingAddressId}
-                        onChange={handleChange}
-                        onBlur={handleBlur}
-                        label="Select Address"
-                      >
-                        {addresses.map((address) => (
-                          <MenuItem key={address._id} value={address._id}>
-                            <Box>
-                              <Typography variant="subtitle2">
-                                {address.label}
-                              </Typography>
-                              <Typography variant="body2" color="textSecondary">
-                                {`${address.street}, ${address.city}`}
-                              </Typography>
-                            </Box>
-                          </MenuItem>
-                        ))}
-                      </Select>
-                      {touched.shippingAddressId && errors.shippingAddressId && (
-                        <FormHelperText>{errors.shippingAddressId}</FormHelperText>
-                      )}
-                    </FormControl>
+          {error && (
+            <Alert 
+              severity="error" 
+              className="mb-4" 
+              onClose={() => setError(null)}
+            >
+              {error}
+            </Alert>
+          )}
+
+          <Paper elevation={2} className="p-6">
+            {/* Shipping Section */}
+            <Box mb={4}>
+              <Typography variant="h6" className="flex items-center gap-2 mb-4">
+                <ShippingIcon /> Shipping Address
+              </Typography>
+              
+              <FormControl fullWidth variant="outlined" error={!selectedAddressId}>
+                <InputLabel>Select Address</InputLabel>
+                <Select
+                  value={selectedAddressId}
+                  onChange={(e) => setSelectedAddressId(e.target.value)}
+                  label="Select Address"
+                >
+                  {allAddresses.map((address) => (
+                    <MenuItem key={address._id} value={address._id}>
+                      <Box className="flex items-center">
+                        {getAddressIcon(address.label)}
+                        <Box ml={1}>
+                          <Typography variant="subtitle2">
+                            {address.label} Address
+                            {profile.primaryAddress?._id === address._id && 
+                              " (Primary)"}
+                          </Typography>
+                          <Typography variant="body2" color="textSecondary">
+                            {address.street}, {address.barangay}, {address.city}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+
+            <Divider />
+
+            {/* Payment Section */}
+            <Box mt={4}>
+              <Typography variant="h6" className="flex items-center gap-2 mb-4">
+                <PaymentIcon /> Payment Method
+              </Typography>
+              
+              <FormControl fullWidth variant="outlined" error={!selectedPaymentMethod}>
+                <InputLabel>Select Payment Method</InputLabel>
+                <Select
+                  value={selectedPaymentMethod}
+                  onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                  label="Select Payment Method"
+                >
+                  <MenuItem value="COD">
+                    <Box className="flex items-center gap-2">
+                      <CashIcon />
+                      Cash on Delivery
+                    </Box>
+                  </MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+
+            <Box mt={4}>
+              <Button
+                onClick={handleSubmit}
+                variant="contained"
+                fullWidth
+                size="large"
+                disabled={loading || !selectedAddressId || !selectedPaymentMethod}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {loading ? (
+                  <Box className="flex items-center justify-center gap-2">
+                    <CircularProgress size={20} color="inherit" />
+                    Processing...
                   </Box>
-
-                  <Divider />
-
-                  {/* Payment Section */}
-                  <Box>
-                    <Typography variant="h6" className="flex items-center gap-2 mb-4">
-                      <CreditCardIcon /> Payment Method
-                    </Typography>
-                    
-                    <FormControl 
-                      fullWidth 
-                      error={touched.paymentMethod && Boolean(errors.paymentMethod)}
-                    >
-                      <InputLabel>Select Payment Method</InputLabel>
-                      <Select
-                        name="paymentMethod"
-                        value={values.paymentMethod}
-                        onChange={handleChange}
-                        onBlur={handleBlur}
-                        label="Select Payment Method"
-                      >
-                        <MenuItem value="STRIPE">
-                          <Box className="flex items-center gap-2">
-                            <CreditCardIcon /> Credit/Debit Card
-                          </Box>
-                        </MenuItem>
-                        <MenuItem value="COD">
-                          <Box className="flex items-center gap-2">
-                            <CashIcon /> Cash on Delivery
-                          </Box>
-                        </MenuItem>
-                      </Select>
-                      {touched.paymentMethod && errors.paymentMethod && (
-                        <FormHelperText>{errors.paymentMethod}</FormHelperText>
-                      )}
-                    </FormControl>
-                  </Box>
-
-                  {paymentComplete && (
-                    <Alert severity="success">
-                      Payment information verified - Ready to place order
-                    </Alert>
-                  )}
-
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    fullWidth
-                    size="large"
-                    disabled={isSubmitting}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    Place Order
-                  </Button>
-                </Paper>
-              </Form>
-            )}
-          </Formik>
+                ) : (
+                  'Place Order'
+                )}
+              </Button>
+            </Box>
+          </Paper>
         </Grid>
 
         {/* Right Column - Order Summary */}
         <Grid item xs={12} md={4}>
-          <Paper className="p-6">
+          <Paper elevation={2} className="p-6">
             <Typography variant="h6" className="flex items-center gap-2 mb-4">
               <CartIcon /> Order Summary
             </Typography>
@@ -205,7 +246,7 @@ const CheckoutForm = ({ addresses, cartItems }) => {
               {cartItems.map((item) => (
                 <Box key={item._id} className="flex gap-4">
                   <img
-                    src={item.image}
+                    src={item.image || '/api/placeholder/80/80'}
                     alt={item.name}
                     className="w-20 h-20 object-cover rounded"
                   />
@@ -232,24 +273,21 @@ const CheckoutForm = ({ addresses, cartItems }) => {
                 </Box>
                 <Box className="flex justify-between">
                   <Typography>Shipping</Typography>
-                  <Typography>Free</Typography>
+                  <Typography className="text-green-600">Free</Typography>
                 </Box>
-                <Box className="flex justify-between font-bold">
-                  <Typography>Total</Typography>
-                  <Typography>₱{cartTotal.toFixed(2)}</Typography>
+                <Box className="flex justify-between">
+                  <Typography variant="subtitle1" className="font-bold">
+                    Total
+                  </Typography>
+                  <Typography variant="subtitle1" className="font-bold">
+                    ₱{cartTotal.toFixed(2)}
+                  </Typography>
                 </Box>
               </Box>
             </Box>
           </Paper>
         </Grid>
       </Grid>
-
-      <StripeEmbeddedPayment
-        open={showStripePayment}
-        onClose={() => setShowStripePayment(false)}
-        onSuccess={handlePaymentSuccess}
-        amount={cartTotal}
-      />
     </Box>
   );
 };

@@ -234,7 +234,33 @@ const Navbar = () => {
   // Search Bar Component
   const SearchBar = () => (
     <div className="hidden md:flex items-center flex-1 max-w-md mx-4" ref={searchRef}>
-    
+      <div className="relative w-full">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={handleSearchInput}
+          onFocus={() => setShowSearchResults(true)}
+          placeholder="Search products..."
+          className="w-full px-4 py-2 pl-10 pr-4 rounded-full border border-gray-300 
+                   focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+        />
+        <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+        
+        {searchQuery && (
+          <button
+            onClick={() => {
+              setSearchQuery('');
+              setSearchResults([]);
+              setShowSearchResults(false);
+            }}
+            className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
+
+        <SearchResults />
+      </div>
     </div>
   );
 
@@ -365,7 +391,7 @@ const Navbar = () => {
             </div>
             <button 
               onClick={() => {
-                setIsCartOpen(false); // Close the cart modal
+             
                 navigate('/user/checkout'); // Navigate to checkout
               }}
               disabled={loading || updatingItemId}

@@ -1,40 +1,45 @@
-// controllers/checkoutController.js
+// controllers/checkout.js
 import CheckoutService from '../services/checkoutService.js';
-import PaymentService from '../services/paymentService.js';
-import orderService from '../services/orderService.js';
-import Stripe from 'stripe';
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-
-
-export const initiateCheckout = async (req, res) => {
+export const createStripeSession = async (req, res) => {
   try {
-    const { shippingAddressId, paymentMethod } = req.body;
+    const { orderId } = req.params;
     const userId = req.user.id;
 
-    if (!shippingAddressId || !paymentMethod) {
+    if (!orderId) {
       return res.status(400).json({
         success: false,
-        message: 'Shipping address and payment method are required'
+        message: "Order ID is required"
       });
     }
 
-    const result = await CheckoutService.initiateCheckout(
-      userId,
-      shippingAddressId,
-      paymentMethod
-    );
-
-    res.status(201).json({
+    const session = await CheckoutService.createStripeSession(orderId, userId);
+    res.status(200).json({
       success: true,
-      data: result
+      data: session
     });
   } catch (error) {
-    console.error('Checkout error:', error);
+    console.error('Create Stripe session error:', error);
     res.status(400).json({
       success: false,
-      message: error.message,
-      details: error.items // For stock validation errors
+      message: error.message || "Error creating Stripe session"
+    });
+  }
+};
+
+export const getStripePublicKey = async (req, res) => {
+  try {
+    res.status(200).json({
+      success: true,
+      data: {
+        publicKey: process.env.STRIPE_PUBLISHABLE_KEY
+      }
+    });
+  } catch (error) {
+    console.error('Get Stripe public key error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Error getting Stripe public key"
     });
   }
 };
@@ -44,17 +49,62 @@ export const getCheckoutStatus = async (req, res) => {
     const { orderId } = req.params;
     const userId = req.user.id;
 
-    const status = await PaymentService.getPaymentStatus(orderId);
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        message: "Order ID is required"
+      });
+    }
 
-    res.status(200).json({
-      success: true,
-      data: status
-    });
+    const result = await CheckoutService.getCheckoutStatus(orderId, userId);
+    res.status(200).json(result);
   } catch (error) {
     console.error('Get checkout status error:', error);
     res.status(400).json({
       success: false,
-      message: error.message
+      message: error.message || "Error getting checkout status"
+    });
+  }
+};
+
+export const handleWebhook = async (req, res) => {
+  try {
+    const sig = req.headers['stripe-signature'];
+    const result = await CheckoutService.handleStripeWebhook(req.body, sig);
+    res.status(200).json({ received: true });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Error processing webhook"
+    });
+  }
+};
+
+export const initiateCheckout = async (req, res) => {
+  try {
+    const { shippingAddressId, paymentMethod } = req.body;
+    const userId = req.user.id;
+
+    if (!shippingAddressId || !paymentMethod) {
+      return res.status(400).json({
+        success: false,
+        message: "Shipping address and payment method are required"
+      });
+    }
+
+    const result = await CheckoutService.initiateCheckout(
+      userId,
+      shippingAddressId,
+      paymentMethod
+    );
+
+    res.status(201).json(result);
+  } catch (error) {
+    console.error('Checkout error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Error processing checkout"
     });
   }
 };
@@ -64,58 +114,93 @@ export const confirmCheckout = async (req, res) => {
     const { orderId } = req.params;
     const userId = req.user.id;
 
-    const order = await CheckoutService.confirmCheckout(orderId, userId);
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        message: "Order ID is required"
+      });
+    }
 
-    res.status(200).json({
-      success: true,
-      data: order
-    });
+    const result = await CheckoutService.confirmCheckout(orderId, userId);
+    res.status(200).json(result);
   } catch (error) {
     console.error('Confirm checkout error:', error);
     res.status(400).json({
       success: false,
-      message: error.message
+      message: error.message || "Error confirming checkout"
     });
   }
 };
 
-export const handleWebhook = async (req, res) => {
+export const confirmStripePayment = async (req, res) => {
   try {
-    const signature = req.headers['stripe-signature'];
-    const event = PaymentService.verifyWebhookSignature(req.body, signature);
+    const { orderId } = req.params;
+    const { paymentIntentId } = req.body;
+    const userId = req.user.id;
 
-    switch (event.type) {
-      case 'payment_intent.succeeded':
-        await CheckoutService.handlePaymentSuccess(
-          event.data.object.metadata.orderId
-        );
-        break;
-
-      case 'payment_intent.payment_failed':
-        await CheckoutService.handlePaymentFailure(
-          event.data.object.metadata.orderId,
-          event.data.object.last_payment_error?.message || 'Payment failed'
-        );
-        break;
-
-      case 'payment_intent.requires_action':
-        // Handle authentication required
-        await CheckoutService.handlePaymentActionRequired(
-          event.data.object.metadata.orderId
-        );
-        break;
-
-      case 'payment_intent.canceled':
-        await CheckoutService.handlePaymentCancellation(
-          event.data.object.metadata.orderId
-        );
-        break;
+    if (!orderId || !paymentIntentId) {
+      return res.status(400).json({
+        success: false,
+        message: "Order ID and payment intent ID are required"
+      });
     }
 
-    res.json({ received: true });
+    const result = await CheckoutService.confirmStripePayment(orderId, userId, paymentIntentId);
+    res.status(200).json(result);
   } catch (error) {
-    console.error('Webhook error:', error);
-    res.status(400).send(`Webhook Error: ${error.message}`);
+    console.error('Stripe payment confirmation error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Error confirming payment"
+    });
+  }
+};
+
+export const handleStripeWebhook = async (req, res) => {
+  try {
+    const sig = req.headers['stripe-signature'];
+    const result = await CheckoutService.handleStripeWebhook(req.body, sig);
+    res.status(200).json({ received: true });
+  } catch (error) {
+    console.error('Stripe webhook error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Error processing webhook"
+    });
+  }
+};
+
+export const getStripeConfig = async (req, res) => {
+  try {
+    const result = await CheckoutService.getStripeConfig();
+    res.status(200).json({
+      success: true,
+      data: {
+        publishableKey: result.publishableKey
+      }
+    });
+  } catch (error) {
+    console.error('Get Stripe config error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Error getting Stripe configuration"
+    });
+  }
+};
+
+export const createPaymentIntent = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const userId = req.user.id;
+
+    const result = await CheckoutService.createPaymentIntent(orderId, userId);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Create payment intent error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Error creating payment intent"
+    });
   }
 };
 
@@ -124,136 +209,98 @@ export const cancelCheckout = async (req, res) => {
     const { orderId } = req.params;
     const userId = req.user.id;
 
-    await CheckoutService.cancelCheckout(orderId, userId);
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        message: "Order ID is required"
+      });
+    }
 
-    res.status(200).json({
-      success: true,
-      message: 'Checkout cancelled successfully'
-    });
+    const result = await CheckoutService.cancelCheckout(orderId, userId);
+    res.status(200).json(result);
   } catch (error) {
     console.error('Cancel checkout error:', error);
     res.status(400).json({
       success: false,
-      message: error.message
+      message: error.message || "Error cancelling checkout"
     });
   }
 };
 
-
-
-
-
-export const getStripePublicKey = (req, res) => {
-  res.json({
-    success: true,
-    publicKey: process.env.STRIPE_PUBLIC_KEY
-  });
-};
-
-export const createStripeSession = async (req, res) => {
+export const getOrderDetails = async (req, res) => {
   try {
-    const { amount, orderId } = req.body;
+    const { orderId } = req.params;
+    const userId = req.user.id;
 
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100),
-      currency: 'php',
-      metadata: { orderId },
-      automatic_payment_methods: {
-        enabled: true,
-      }
-    });
-
-    res.json({
-      success: true,
-      clientSecret: paymentIntent.client_secret
-    });
-  } catch (error) {
-    console.error('Create payment intent error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-export const confirmStripePayment = async (req, res) => {
-  try {
-    const { paymentIntentId, orderId } = req.body;
-
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-
-    if (paymentIntent.status === 'succeeded') {
-      // Update order status
-      const order = await Order.findByIdAndUpdate(
-        orderId,
-        {
-          paymentStatus: 'PAID',
-          paymentDetails: {
-            method: 'STRIPE',
-            transactionId: paymentIntentId,
-            paidAt: new Date()
-          }
-        },
-        { new: true }
-      );
-
-      res.json({
-        success: true,
-        order
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        message: "Order ID is required"
       });
-    } else {
-      throw new Error('Payment not successful');
     }
+
+    const result = await CheckoutService.getOrderDetails(orderId, userId);
+    res.status(200).json(result);
   } catch (error) {
-    console.error('Confirm payment error:', error);
-    res.status(500).json({
+    console.error('Get order details error:', error);
+    res.status(400).json({
       success: false,
-      message: error.message
+      message: error.message || "Error fetching order details"
     });
   }
 };
 
-
-
-const handleSuccessfulPayment = async (paymentIntent) => {
-  const orderId = paymentIntent.metadata.orderId;
-  
-  await Order.findByIdAndUpdate(orderId, {
-    paymentStatus: 'PAID',
-    orderStatus: 'PROCESSING',
-    paymentDetails: {
-      method: 'STRIPE',
-      transactionId: paymentIntent.id,
-      paidAt: new Date()
-    }
-  });
+export const getUserOrders = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const result = await CheckoutService.getUserOrders(userId);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Get user orders error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Error fetching user orders"
+    });
+  }
 };
 
-const handleFailedPayment = async (paymentIntent) => {
-  const orderId = paymentIntent.metadata.orderId;
-  
-  await Order.findByIdAndUpdate(orderId, {
-    paymentStatus: 'FAILED',
-    orderStatus: 'CANCELLED',
-    paymentDetails: {
-      method: 'STRIPE',
-      transactionId: paymentIntent.id,
-      error: paymentIntent.last_payment_error?.message
+export const updateOrderStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status, note } = req.body;
+    const userId = req.user.id;
+
+    if (!orderId || !status) {
+      return res.status(400).json({
+        success: false,
+        message: "Order ID and new status are required"
+      });
     }
-  });
+
+    const result = await CheckoutService.updateOrderStatus(orderId, userId, status.toUpperCase(), note);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Update order status error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Error updating order status"
+    });
+  }
 };
 
 export default {
-    initiateCheckout,
-    getCheckoutStatus,
-    confirmCheckout,
-    handleWebhook,
-    cancelCheckout,
-    getStripePublicKey,
-    createStripeSession,
-    confirmStripePayment,
-    handleSuccessfulPayment,
-    handleFailedPayment,
-
-  };
-  
+  createStripeSession,
+  getStripePublicKey,
+  getCheckoutStatus,
+  handleWebhook,
+  initiateCheckout,
+  confirmCheckout,
+  confirmStripePayment,
+  handleStripeWebhook,
+  getStripeConfig,
+  createPaymentIntent,
+  cancelCheckout,
+  getOrderDetails,
+  getUserOrders,
+  updateOrderStatus
+};

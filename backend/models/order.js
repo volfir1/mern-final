@@ -16,8 +16,8 @@ const orderItemSchema = new mongoose.Schema({
 const orderSchema = new mongoose.Schema({
   orderNumber: {
     type: String,
-    unique: true,
-    required: true
+    unique: true
+    // Removed required: true since we'll generate it
   },
   user: {
     type: mongoose.Schema.Types.ObjectId,
@@ -25,7 +25,6 @@ const orderSchema = new mongoose.Schema({
     required: true
   },
   items: [orderItemSchema],
-  // Reference to address in UserProfile
   shippingAddressId: {
     type: mongoose.Schema.Types.ObjectId,
     required: true
@@ -53,7 +52,7 @@ const orderSchema = new mongoose.Schema({
   }],
   subtotal: Number,
   total: Number
-}, { 
+}, {
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
@@ -68,23 +67,33 @@ orderSchema.virtual('shippingAddress', {
 });
 
 // Generate order number
-orderSchema.pre('save', async function(next) {
-  if (this.isNew) {
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    
-    const count = await mongoose.model('Order').countDocuments({
-      createdAt: {
-        $gte: new Date(date.setHours(0, 0, 0, 0)),
-        $lt: new Date(date.setHours(23, 59, 59, 999))
-      }
-    });
-    
-    this.orderNumber = `ORD-${year}${month}${day}-${String(count + 1).padStart(4, '0')}`;
+orderSchema.pre('validate', async function(next) {
+  try {
+    if (!this.orderNumber) {
+      const date = new Date();
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      const count = await mongoose.model('Order').countDocuments({
+        createdAt: {
+          $gte: startOfDay,
+          $lt: endOfDay
+        }
+      });
+      
+      this.orderNumber = `ORD-${year}${month}${day}-${String(count + 1).padStart(4, '0')}`;
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
 // Track status changes

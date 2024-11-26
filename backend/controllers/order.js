@@ -1,35 +1,10 @@
-// controllers/orderController.js
+// controllers/order.js
 import Order from '../models/order.js';
 import Cart from '../models/cart.js';
 import UserProfile from '../models/userProfile.js';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
-export const generateOrderNumber = async () => {
-    // Get the current date
-    const date = new Date();
-    const year = date.getFullYear().toString().slice(-2); // Get last 2 digits of year
-    const month = (date.getMonth() + 1).toString().padStart(2, '0'); // Month with leading zero
-    const day = date.getDate().toString().padStart(2, '0'); // Day with leading zero
-    
-    // Get the count of orders for today to generate sequential number
-    const startOfDay = new Date(date.setHours(0, 0, 0, 0));
-    const endOfDay = new Date(date.setHours(23, 59, 59, 999));
-    
-    const orderCount = await Order.countDocuments({
-        createdAt: {
-            $gte: startOfDay,
-            $lte: endOfDay
-        }
-    });
-
-    // Generate sequence number (4 digits with leading zeros)
-    const sequence = (orderCount + 1).toString().padStart(4, '0');
-    
-    // Combine all parts (format: YYMMDD####)
-    return `${year}${month}${day}${sequence}`;
-};
 
 export const createOrder = async (req, res) => {
     try {
@@ -70,20 +45,10 @@ export const createOrder = async (req, res) => {
             });
         }
 
-        // Get the selected address details
-        const selectedAddress = isPrimaryAddress 
-            ? userProfile.primaryAddress 
-            : userProfile.additionalAddresses.find(addr => addr._id.toString() === shippingAddressId);
-
-        // Generate order number
-        const orderNumber = await generateOrderNumber();
-
-        // Create order with both shippingAddressId and shippingAddress
+        // Create order - orderNumber will be generated automatically in pre-save middleware
         const order = new Order({
-            orderNumber,
             user: userId,
-            shippingAddressId: shippingAddressId, // Add this line
-            shippingAddress: selectedAddress.toObject(), // Keep this for reference
+            shippingAddressId: shippingAddressId,
             paymentMethod,
             items: cart.items.map(item => ({
                 product: item.product._id,
@@ -104,17 +69,15 @@ export const createOrder = async (req, res) => {
                 amount: Math.round(cart.total * 100),
                 currency: 'php',
                 metadata: {
-                    orderId: order._id.toString(),
-                    orderNumber: orderNumber
+                    orderId: order._id.toString()
                 }
             });
             order.stripePaymentIntentId = paymentIntent.id;
         }
 
         await order.save();
-
-        // Clear cart after successful order creation
         await cart.clear();
+        await order.populate('shippingAddress');
 
         res.status(201).json({
             success: true,
@@ -127,38 +90,6 @@ export const createOrder = async (req, res) => {
             success: false,
             message: error.message || "Error creating order",
             error: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
-    }
-};
-
-export const getOrderById = async (req, res) => {
-    try {
-        const { orderId } = req.params;
-        const userId = req.user.id;
-
-        const order = await Order.findById(orderId)
-            .populate('user', 'email')
-            .populate({
-                path: 'items.product',
-                select: 'name price images'
-            });
-
-        if (!order || (order.user._id.toString() !== userId && req.user.role !== 'admin')) {
-            return res.status(404).json({
-                success: false,
-                message: "Order not found"
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            data: order
-        });
-    } catch (error) {
-        console.error('Get order error:', error);
-        res.status(500).json({
-            success: false,
-            message: error.message || "Error fetching order"
         });
     }
 };
@@ -179,6 +110,7 @@ export const getUserOrders = async (req, res) => {
                 path: 'items.product',
                 select: 'name price images'
             })
+            .populate('shippingAddress')
             .sort({ createdAt: -1 });
 
         res.status(200).json({
@@ -191,6 +123,39 @@ export const getUserOrders = async (req, res) => {
         res.status(500).json({
             success: false,
             message: error.message || "Error fetching orders"
+        });
+    }
+};
+
+export const getOrderById = async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const userId = req.user.id;
+
+        const order = await Order.findById(orderId)
+            .populate('user', 'email')
+            .populate({
+                path: 'items.product',
+                select: 'name price images'
+            })
+            .populate('shippingAddress');
+
+        if (!order || (order.user._id.toString() !== userId && req.user.role !== 'admin')) {
+            return res.status(404).json({
+                success: false,
+                message: "Order not found"
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: order
+        });
+    } catch (error) {
+        console.error('Get order error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || "Error fetching order"
         });
     }
 };
@@ -240,6 +205,7 @@ export const handleStripeWebhook = async (req, res) => {
                 if (order) {
                     order.paymentStatus = 'PAID';
                     order.orderStatus = 'PROCESSING';
+                    order._statusNote = 'Payment received';
                     await order.save();
                 }
                 break;
@@ -252,6 +218,7 @@ export const handleStripeWebhook = async (req, res) => {
                 
                 if (order) {
                     order.paymentStatus = 'FAILED';
+                    order._statusNote = paymentIntent.last_payment_error?.message || 'Payment failed';
                     await order.save();
                 }
                 break;
@@ -266,4 +233,13 @@ export const handleStripeWebhook = async (req, res) => {
             message: `Webhook Error: ${error.message}`
         });
     }
+};
+
+// Export all controller functions
+export default {
+    createOrder,
+    getUserOrders,     // Added this export
+    getOrderById,
+    updateOrderStatus,
+    handleStripeWebhook
 };

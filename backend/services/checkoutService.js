@@ -4,148 +4,184 @@ import Order from '../models/order.js';
 import Product from '../models/product.js';
 import UserProfile from '../models/userProfile.js';
 import PaymentService from './paymentService.js';
+import mongoose from 'mongoose';
 
 class CheckoutService {
   static async initiateCheckout(userId, shippingAddressId, paymentMethod) {
-    // Start a transaction
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-      // 1. Validate and get data
-      const { cart, address } = await this.validateCheckoutData(
-        userId,
-        shippingAddressId,
-        paymentMethod
-      );
+      // Validate cart
+      const cart = await Cart.findOne({ user: userId }).populate('items.product');
+      if (!cart?.items?.length) {
+        throw new Error('Cart is empty');
+      }
 
-      // 2. Create order
-      const order = await this.createOrder(
-        userId,
-        cart,
-        address,
+      // Validate address
+      const userProfile = await UserProfile.findOne({ userId });
+      const address = this.validateAddress(userProfile, shippingAddressId);
+      if (!address) {
+        throw new Error('Invalid shipping address');
+      }
+
+      // Create order
+      const order = new Order({
+        user: userId,
+        items: cart.items.map(item => ({
+          product: item.product._id,
+          name: item.product.name,
+          price: item.price,
+          quantity: item.quantity,
+          subtotal: item.subtotal
+        })),
         shippingAddressId,
+        shippingAddress: address,
         paymentMethod,
-        session
-      );
+        subtotal: cart.total,
+        total: cart.total,
+        orderStatus: 'PENDING',
+        paymentStatus: 'PENDING',
+        _statusNote: 'Order created'
+      });
 
-      // 3. Process payment
-      const paymentResult = await PaymentService.processPayment(
-        order._id,
-        paymentMethod
-      );
-
-      // 4. Clear cart
+      // Save order and clear cart
+      await order.save({ session });
       await cart.clear({ session });
 
       // Commit transaction
       await session.commitTransaction();
+      session.endSession();
+
+      // Process payment
+      const paymentResult = await PaymentService.processPayment(
+        order._id.toString(),
+        paymentMethod
+      );
+
+      // Update order status if payment is successful
+      if (paymentResult.success) {
+        order.orderStatus = 'PROCESSING';
+        order._statusNote = 'Payment processed successfully';
+        await order.save();
+      }
 
       return {
-        order,
-        paymentDetails: paymentResult
+        success: true,
+        message: "Order created successfully",
+        data: order    // Return the entire order object
       };
+
     } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
+      if (session.inTransaction()) {
+        await session.abortTransaction();
+      }
       session.endSession();
+      console.error('Checkout error:', error);
+      throw error;
     }
-  }
-
-  static async validateCheckoutData(userId, shippingAddressId, paymentMethod) {
-    // Validate cart
-    const cart = await Cart.findOne({ user: userId }).populate('items.product');
-    if (!cart?.items?.length) {
-      throw new Error('Cart is empty');
-    }
-
-    // Validate address
-    const userProfile = await UserProfile.findOne({ userId });
-    const address = this.validateAddress(userProfile, shippingAddressId);
-    if (!address) {
-      throw new Error('Invalid shipping address');
-    }
-
-    // Validate stock
-    await this.validateStock(cart.items);
-
-    return { cart, address };
   }
 
   static validateAddress(userProfile, addressId) {
     if (!userProfile) return null;
 
-    if (userProfile.primaryAddress?._id.toString() === addressId) {
+    // Check primary address
+    if (userProfile.primaryAddress?._id.toString() === addressId.toString()) {
       return userProfile.primaryAddress;
     }
 
+    // Check additional addresses
     return userProfile.additionalAddresses?.find(
-      addr => addr._id.toString() === addressId
+      addr => addr._id.toString() === addressId.toString()
     );
   }
 
-  static async validateStock(items) {
-    const insufficientStock = [];
-
-    for (const item of items) {
-      const product = await Product.findById(item.product);
-      if (!product || product.stockQuantity < item.quantity) {
-        insufficientStock.push({
-          product: item.product,
-          requested: item.quantity,
-          available: product?.stockQuantity || 0
-        });
-      }
+  static async confirmCheckout(orderId, userId) {
+    const order = await Order.findOne({ _id: orderId, user: userId });
+    if (!order) {
+      throw new Error('Order not found');
     }
 
-    if (insufficientStock.length > 0) {
-      throw new Error('Insufficient stock for some items', {
-        items: insufficientStock
-      });
+    // Allow confirmation for both PENDING and PROCESSING statuses
+    if (!['PENDING', 'PROCESSING'].includes(order.orderStatus)) {
+      throw new Error('Order cannot be confirmed in its current status');
     }
+
+    order.orderStatus = 'PROCESSING';
+    order._statusNote = 'Order confirmed by user';
+    await order.save();
+
+    return {
+      success: true,
+      message: "Order confirmed successfully",
+      data: order
+    };
   }
 
-  static async createOrder(userId, cart, address, shippingAddressId, paymentMethod, session) {
-    const order = new Order({
+  static async cancelCheckout(orderId, userId) {
+    const order = await Order.findOne({ 
+      _id: orderId, 
       user: userId,
-      orderNumber: await Order.generateOrderNumber(),
-      items: cart.items.map(item => ({
-        product: item.product._id,
-        name: item.product.name,
-        price: item.price,
-        quantity: item.quantity,
-        subtotal: item.subtotal
-      })),
-      shippingAddressId,
-      shippingAddress: address,
-      paymentMethod,
-      subtotal: cart.total,
-      total: cart.total,
-      orderStatus: 'PENDING',
-      paymentStatus: 'PENDING'
+      orderStatus: { $nin: ['DELIVERED', 'CANCELLED'] }
     });
 
-    await order.save({ session });
-    return order;
+    if (!order) {
+      throw new Error('Order not found or cannot be cancelled');
+    }
+
+    order.orderStatus = 'CANCELLED';
+    order.paymentStatus = 'CANCELLED';
+    order._statusNote = 'Cancelled by user';
+    await order.save();
+
+    return {
+      success: true,
+      message: "Order cancelled successfully",
+      data: order
+    };
   }
 
-  static async handlePaymentSuccess(orderId) {
-    const order = await Order.findById(orderId);
+  static async getOrderDetails(orderId, userId) {
+    const order = await Order.findOne({ _id: orderId, user: userId })
+      .populate('items.product')
+      .populate('shippingAddress');
+
     if (!order) {
       throw new Error('Order not found');
     }
 
-    return PaymentService.handleStripeSuccess(order.stripePaymentIntentId);
+    return {
+      success: true,
+      data: order
+    };
   }
 
-  static async handlePaymentFailure(orderId, reason) {
-    const order = await Order.findById(orderId);
+  static async getUserOrders(userId) {
+    const orders = await Order.find({ user: userId })
+      .sort({ createdAt: -1 })
+      .populate('items.product');
+
+    return {
+      success: true,
+      data: orders
+    };
+  }
+
+  static async updateOrderStatus(orderId, userId, newStatus, note) {
+    const order = await Order.findOne({ _id: orderId, user: userId });
     if (!order) {
       throw new Error('Order not found');
     }
 
-    return PaymentService.handleStripeFailure(order.stripePaymentIntentId, reason);
+    order.orderStatus = newStatus;
+    order._statusNote = note || `Status updated to ${newStatus}`;
+    await order.save();
+
+    return {
+      success: true,
+      message: "Order status updated successfully",
+      data: order
+    };
   }
 }
 
