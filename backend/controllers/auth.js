@@ -2,7 +2,7 @@
 import mongoose from 'mongoose';
 import { OAuth2Client } from 'google-auth-library';
 import admin, { auth, firebaseOperations, realtimeDb, db} from '../config/firebase-admin.js';
-import User from '../models/userAuth.js';
+import UserAuth from '../models/userAuth.js';
 import UserProfile from '../models/userProfile.js';
 import { uploadImage, deleteImage, CLOUDINARY_FOLDERS, DEFAULT_IMAGES } from '../utils/cloudinary.js';
 import { verifyToken } from '../utils/jwtToken.js';
