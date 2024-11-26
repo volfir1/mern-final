@@ -33,6 +33,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "countries-list": "^3.1.1",
+    "date-fns": "^4.1.0",
     "env": "^0.0.2",
     "express-list-endpoints": "^7.1.0",
     "firebase": "^11.0.2",

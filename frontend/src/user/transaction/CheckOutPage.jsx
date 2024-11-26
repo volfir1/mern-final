@@ -151,45 +151,35 @@ const CheckoutPage = () => {
 
   const handleSubmit = async (values, { setSubmitting, setErrors }) => {
     try {
-      // Validate phone number format (matching your profile validation)
-      const phoneRegex = /^(09|\+639)\d{9}$/;
-      if (!phoneRegex.test(values.phone)) {
-        setErrors({ phone: 'Please enter a valid Philippine mobile number (e.g., 09123456789)' });
-        return;
-      }
-
       if (values.paymentMethod === 'STRIPE' && !paymentComplete) {
-        updateState({ showStripePayment: true });
+        setShowStripePayment(true);
         setSubmitting(false);
         return;
       }
-
+  
       const checkoutData = {
         ...values,
         ...(clientSecret && { stripeClientSecret: clientSecret })
       };
-
-      const response = await api.post('/api/checkout', checkoutData);
-
-      if (response.data.success) {
-        toast.success('Order placed successfully!');
-        navigate(`/user/orders/${response.data.order._id}/confirmation`);
-      } else {
-        setErrors({ submit: response.data.message });
-      }
-
-    } catch (error) {
-      console.error('Checkout error:', error);
-      
-      if (error.response?.status === 401) {
-        navigate('/login', { state: { from: '/user/checkout' } });
+  
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(checkoutData)
+      });
+  
+      const data = await response.json();
+      if (!data.success) {
+        setErrors({ submit: data.message });
         return;
       }
-
-      setErrors({ 
-        submit: error.response?.data?.message || 
-                'Failed to process checkout. Please try again.' 
-      });
+  
+      // Handle successful checkout
+      toast.success('Order placed successfully!');
+      navigate('/user/products');  // Changed to navigate to products page
+    } catch (error) {
+      console.error('Checkout error:', error);
+      setErrors({ submit: 'Failed to process checkout. Please try again.' });
     } finally {
       setSubmitting(false);
     }

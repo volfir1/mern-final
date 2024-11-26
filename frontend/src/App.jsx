@@ -25,6 +25,7 @@ const ProfileManagement = lazy(() => import('./user/profile/ProfileManagement'))
 const CheckOut = lazy(()=>import('./user/transaction/CheckOutPage'));
 const HomePage = lazy(()=> import('./HomePage'));
 const Cart = lazy(()=>import('./user/transaction/Cart'));
+const OrderPage =lazy(()=> import('./user/order/UserOrders'))
 
 // Loading Spinner Component
 const LoadingSpinner = () => (
@@ -204,6 +205,7 @@ const AppRoutes = () => {
               <Route path="profile" element={<ProfileManagement />} />
               <Route path="checkout" element={<CheckOut/>} />
               <Route path="cart" element={<Cart/>} />
+              <Route path="orders" element={<OrderPage/>} />
             </Routes>
           </UserRoute>
         }
