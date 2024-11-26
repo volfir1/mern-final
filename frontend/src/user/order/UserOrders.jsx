@@ -108,7 +108,7 @@ const UserOrders = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/checkout/orders');
+      const response = await api.get('/orders');
       if (response.data.success) {
         setOrders(response.data.data);
       } else {
