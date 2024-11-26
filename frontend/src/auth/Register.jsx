@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Formik, Form } from 'formik';
 import * as Yup from 'yup';
@@ -16,7 +16,7 @@ import {
   VisibilityOff,
   HowToReg as RegisterIcon
 } from '@mui/icons-material';
-import api from '../utils/api'; // Using the API directly
+import axios from 'axios'; // Make sure to import axios if not already done
 
 // Enhanced password strength checker with better scoring
 const getPasswordStrength = (password) => {
@@ -101,12 +101,19 @@ const Register = () => {
         error: null
       }));
 
-      // Register using the API
-      await api.authEndpoints.register({
+      // Use axios directly for registration
+      const response = await axios.post('/api/auth/register', {
         firstName: values.firstName.trim(),
         lastName: values.lastName.trim(),
         email: values.email.toLowerCase().trim(),
         password: values.password
+      }, {
+        // Explicitly set no authentication required
+        withCredentials: false,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': null
+        }
       });
 
       // Redirect to verify email page after successful registration
@@ -114,9 +121,14 @@ const Register = () => {
         state: { email: values.email.toLowerCase().trim() }
       });
     } catch (error) {
+      // More robust error handling
+      const errorMessage = error.response?.data?.message || 
+                           error.response?.data?.error || 
+                           'Registration failed. Please try again.';
+      
       setFormState(prev => ({
         ...prev,
-        error: error.response?.data?.message || 'Registration failed. Please try again.'
+        error: errorMessage
       }));
     } finally {
       setSubmitting(false);
