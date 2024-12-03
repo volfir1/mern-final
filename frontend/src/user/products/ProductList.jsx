@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container, Box, Typography, Pagination, 
-  CircularProgress, Alert, Button
+  CircularProgress, Alert, Button, Stack
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import ProductGrid from './ProductGrid';
 import { productApi } from '@/api/productApi';
 import { cartApi } from '@/api/cartApi';
 
-const ITEMS_PER_PAGE = 12;
+const ITEMS_PER_PAGE = 10;
 
 const ProductListContainer = () => {
   const [state, setState] = useState({
@@ -16,73 +16,50 @@ const ProductListContainer = () => {
     loading: true,
     error: null,
     page: 1,
-    pagination: {
-      currentPage: 1,
-      totalPages: 1,
-      totalProducts: 0
-    }
+    totalPages: 1,
+    totalProducts: 0
   });
-  const handleEdit = async (productId) => {
-    // Navigate to edit page or open modal
-    navigate(`/products/edit/${productId}`);
-  };
-  
-  const handleDelete = async (productId) => {
-    try {
-      await productApi.deleteProduct(productId);
-      toast.success('Product deleted successfully');
-      fetchProducts(); // Refresh list
-    } catch (error) {
-      toast.error(error.message);
-    }
-  };
-  
-  const handleCreate = () => {
-    navigate('/products/create');
-  };
-  const fetchProducts = useCallback(async () => {
+
+  const fetchProducts = useCallback(async (page) => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
-      
-      const response = await productApi.getAllProducts(state.page);
+      const response = await productApi.getAllProducts(page, ITEMS_PER_PAGE);
       
       if (response?.data?.success) {
+        const { data, pagination } = response.data;
         setState(prev => ({
           ...prev,
-          products: response.data.data || [],
-          pagination: {
-            currentPage: response.data.currentPage || 1,
-            totalPages: response.data.totalPages || 1,
-            totalProducts: response.data.totalProducts || 0
-          }
+          products: data,
+          totalPages: pagination.totalPages,
+          totalProducts: pagination.totalProducts,
+          loading: false
         }));
       } else {
-        throw new Error(response?.data?.message || 'Failed to fetch products');
+        throw new Error('Failed to fetch products');
       }
     } catch (err) {
-      console.error('Error fetching products:', err);
+      console.error('Fetch error:', err);
       setState(prev => ({
         ...prev,
-        error: err.message || 'Failed to load products',
-        products: []
+        error: err.message,
+        loading: false
       }));
       toast.error('Failed to load products');
-    } finally {
-      setState(prev => ({ ...prev, loading: false }));
     }
-  }, [state.page]);
+  }, []);
+  
 
   useEffect(() => {
-    const timeoutId = setTimeout(fetchProducts, 300);
-    return () => clearTimeout(timeoutId);
+    fetchProducts();
   }, [fetchProducts]);
 
-  const handlePageChange = useCallback((_, newPage) => {
+  const handlePageChange = (_, newPage) => {
     setState(prev => ({ ...prev, page: newPage }));
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+    fetchProducts(newPage);
+  };
 
-  const handleAddToCart = useCallback(async (product, quantity) => {
+  const handleAddToCart = async (product, quantity) => {
     try {
       if (!product?._id) throw new Error('Invalid product ID');
       
@@ -97,9 +74,8 @@ const ProductListContainer = () => {
     } catch (error) {
       console.error('Add to cart error:', error);
       toast.error(error.message || 'Failed to add item to cart');
-      throw error;
     }
-  }, []);
+  };
 
   if (state.error) {
     return (
@@ -119,53 +95,55 @@ const ProductListContainer = () => {
     );
   }
 
-  const { loading, products, pagination } = state;
-
   return (
-    <Container maxWidth="xl" className="py-4">
-      <Box className="mb-4">
+    <Container maxWidth="xl">
+      <Box sx={{ py: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom>
-          Our Products {!loading && `(${pagination.totalProducts})`}
+          Our Products {!state.loading && state.totalProducts > 0 && 
+            `(${state.totalProducts})`}
         </Typography>
-        <Typography variant="body1" className="text-gray-600">
-          Discover our collection of amazing products
-        </Typography>
+
+        {state.loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Stack spacing={4}>
+            <ProductGrid 
+              products={state.products} 
+              onAddToCart={handleAddToCart} 
+            />
+
+            {state.totalPages > 1 && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Page {state.page} of {state.totalPages}
+                </Typography>
+                <Pagination
+                  count={state.totalPages}
+                  page={state.page}
+                  onChange={handlePageChange}
+                  color="primary"
+                  size="large"
+                  showFirstButton
+                  showLastButton
+                  disabled={state.loading}
+                  siblingCount={1}
+                  boundaryCount={1}
+                />
+              </Box>
+            )}
+
+            {state.products.length === 0 && !state.loading && (
+              <Box sx={{ textAlign: 'center', py: 8 }}>
+                <Typography variant="h6" color="text.secondary">
+                  No products found
+                </Typography>
+              </Box>
+            )}
+          </Stack>
+        )}
       </Box>
-
-      {loading ? (
-        <Box className="flex justify-center items-center min-h-[60vh]">
-          <CircularProgress />
-        </Box>
-      ) : (
-        <>
-          <ProductGrid
-            products={products}
-            onAddToCart={handleAddToCart}
-          />
-
-          {pagination.totalPages > 1 && (
-            <Box className="flex justify-center mt-4">
-              <Pagination
-                count={pagination.totalPages}
-                page={pagination.currentPage}
-                onChange={handlePageChange}
-                color="primary"
-                size="large"
-                showFirstButton
-                showLastButton
-              />
-            </Box>
-          )}
-
-          {products.length === 0 && !loading && (
-            <Box className="text-center py-8">
-              <Typography variant="h6" className="text-gray-600">
-                No products found
-              </Typography>
-            </Box>
-          )}
-        </>
-      )}
     </Container>
   );
 };

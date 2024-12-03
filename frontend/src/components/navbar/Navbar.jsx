@@ -422,6 +422,9 @@ const Navbar = () => {
             <Link to="/user/profile" className="text-gray-700 hover:text-blue-600 px-3 py-2">
                Your Profile
             </Link>
+            <Link to="/user/orders" className="text-gray-700 hover:text-blue-600 px-3 py-2">
+               Your Orders
+            </Link>
            
           </div>
 

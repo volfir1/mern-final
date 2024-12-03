@@ -1,4 +1,3 @@
-// routes/orderRoutes.js
 import express from 'express';
 import { protect, authorize } from '../middleware/auth.js';
 import {
@@ -6,7 +5,8 @@ import {
     getOrderById,
     getUserOrders,
     updateOrderStatus,
-    handleStripeWebhook
+    handleStripeWebhook,
+    getAllOrders // Add this import
 } from '../controllers/order.js';
 
 const router = express.Router();
@@ -15,19 +15,18 @@ const router = express.Router();
 router.post('/webhook', handleStripeWebhook);
 
 // Protected routes - require authentication
-router.use(protect); // Apply authentication to all routes below
+router.use(protect);
+
+// Admin routes (place these first to avoid route conflicts)
+router.get('/admin/orders', authorize('admin'), getAllOrders);
+router.patch('/:orderId/status', authorize('admin'), updateOrderStatus);
 
 // User routes
 router.route('/')
-    .post(authorize('user'), createOrder)           // Create new order
-    .get(authorize('user'), getUserOrders);         // Get user's orders
+    .post(authorize('user'), createOrder)
+    .get(authorize('user'), getUserOrders);
 
 router.route('/:orderId')
-    .get(authorize('user'), getOrderById);          // Get specific order
-
-// Admin routes
-router.route('/:orderId/status')
-    .patch(authorize('admin'), updateOrderStatus);   // Update order status (admin only)
-    
+    .get(authorize('user'), getOrderById);
 
 export default router;

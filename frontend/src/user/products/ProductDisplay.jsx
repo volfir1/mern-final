@@ -6,8 +6,8 @@ import {
   CircularProgress,
   Alert,
   Button,
+  TablePagination,
 } from '@mui/material';
-import { useInView } from 'react-intersection-observer';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { productApi } from '@/api/productApi';
@@ -20,84 +20,70 @@ const ProductDisplay = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  
-  // Set up intersection observer with optimized settings
-  const { ref: loadMoreRef, inView } = useInView({
-    threshold: 0.1, // Trigger when just 10% of the element is visible
-    rootMargin: '10px', // Start loading 100px before the element comes into view
-    triggerOnce: false,
-  });
+  const [page, setPage] = useState(0);
+const [rowsPerPage, setRowsPerPage] = useState(10);
+const [totalProducts, setTotalProducts] = useState(0);
+const [currentPage, setCurrentPage] = useState(0);
+const [totalPages, setTotalPages] = useState(0);
+  const [pages, setPages] = useState(0);
 
-  const fetchProducts = useCallback(async (pageNum) => {
+  const fetchProducts = useCallback(async (pageNum, limit) => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Fetching products for page:', pageNum);
-      
-      // Fetch 10 products per page
-      const response = await productApi.getAllProducts(pageNum, 10);
-      console.log('API Response:', response);
-
+      const response = await productApi.getAllProducts(pageNum + 1, limit);
+  
       if (response?.data?.success) {
-        const newProducts = response.data.data || [];
-        
-        // Append new products to existing ones
-        setProducts(prev => {
-          // If it's the first page, replace all products
-          if (pageNum === 1) return newProducts;
-          
-          // For subsequent pages, append new products
-          // Remove any duplicates by ID
-          const existingIds = new Set(prev.map(p => p._id));
-          const uniqueNewProducts = newProducts.filter(p => !existingIds.has(p._id));
-          return [...prev, ...uniqueNewProducts];
-        });
-        
-        // Check if we've reached the end
-        // We'll consider we have more if we received a full page of products
-        setHasMore(newProducts.length === 10);
+        const { data, pagination } = response.data;
+        setProducts(data);
+        setTotalProducts(pagination.totalProducts);
+        setTotalPages(pagination.totalPages);
+        setCurrentPage(pageNum); // Keep 0-based for MUI pagination
+        setPage(pageNum);
       } else {
-        throw new Error(response?.data?.message || 'Failed to fetch products');
+        throw new Error('Failed to fetch products');
       }
     } catch (err) {
-      console.error('Error fetching products:', err);
-      setError(err.message || 'Failed to load products. Please try again later.');
-      if (pageNum === 1) setProducts([]);
+      console.error('Fetch error:', err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   }, []);
+  
 
-  // Initial load
   useEffect(() => {
-    fetchProducts(1);
-  }, [fetchProducts]);
+    fetchProducts(page, rowsPerPage);
+  }, [fetchProducts, page, rowsPerPage]);
 
-  // Load more when scrolling to bottom
-  useEffect(() => {
-    if (inView && !loading && hasMore) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchProducts(nextPage);
-    }
-  }, [inView, loading, hasMore, page, fetchProducts]);
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+    fetchProducts(newPage, rowsPerPage);
+  };
 
-  // Add to cart handler
+  const handleChangeRowsPerPage = (event) => {
+    const newRowsPerPage = parseInt(event.target.value, 10);
+    setRowsPerPage(newRowsPerPage);
+    setPage(0); // Reset to first page
+    fetchProducts(0, newRowsPerPage);
+  };
+
+  const handleRetry = () => {
+    setPage(0);
+    fetchProducts(0, rowsPerPage);
+  };
+
   const handleAddToCart = async (product, quantity) => {
     try {
-      console.log('Adding to cart:', { product, quantity });
-  
       if (!product?._id) {
         throw new Error('Invalid product ID');
       }
-  
+
       const response = await cartApi.addToCart(product._id, quantity);
-      
+
       if (response.success) {
         toast.success(`Added ${quantity} ${product.name} to cart`);
-        window.dispatchEvent(new CustomEvent('cart-updated'));
+        window.dispatchEvent(new CustomEvent('cart-updated')); // You can trigger any event here for cart update
       } else {
         throw new Error(response.message || 'Failed to add item to cart');
       }
@@ -106,12 +92,6 @@ const ProductDisplay = () => {
       toast.error(error.message || 'Failed to add item to cart');
       throw error;
     }
-  };
-
-  // Handle retry on error
-  const handleRetry = () => {
-    setPage(1);
-    fetchProducts(1);
   };
 
   if (error && products.length === 0) {
@@ -138,26 +118,22 @@ const ProductDisplay = () => {
       
       <div className="pt-16">
         <Container maxWidth="lg" sx={{ py: 4 }}>
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="h4" component="h1" gutterBottom>
-              Products
-            </Typography>
-          </Box>
+        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+  <Typography variant="h4" component="h1">
+    Products {!loading && totalProducts > 0 && `(${totalProducts})`}
+  </Typography>
+</Box>
 
           <ProductGrid 
             products={products}
-            onAddToCart={handleAddToCart}
+            onAddToCart={handleAddToCart} // Pass the function as a prop
           />
-          
-          {/* Loading indicator at bottom */}
-          <Box 
-            ref={loadMoreRef} 
-            display="flex" 
-            justifyContent="center" 
-            py={4}
-          >
-            {loading && <CircularProgress size={40} />}
-          </Box>
+
+          {loading && (
+            <Box display="flex" justifyContent="center" py={4}>
+              <CircularProgress size={40} />
+            </Box>
+          )}
 
           {!loading && products.length === 0 && (
             <Box 
@@ -176,13 +152,22 @@ const ProductDisplay = () => {
             </Box>
           )}
 
-          {!hasMore && products.length > 0 && (
-            <Box textAlign="center" py={4}>
-              <Typography color="text.secondary">
-                You've reached the end
-              </Typography>
-            </Box>
-          )}
+{products.length > 0 && (
+  <Box sx={{ py: 2, display: 'flex', justifyContent: 'flex-end' }}>
+    <TablePagination
+      component="div"
+      count={totalProducts} // Total number of products
+      page={page} // Current page (0-based)
+      onPageChange={handleChangePage}
+      rowsPerPage={rowsPerPage}
+      onRowsPerPageChange={handleChangeRowsPerPage}
+      rowsPerPageOptions={[5, 10, 25, 50]}
+      labelRowsPerPage="Products per page:"
+      labelDisplayedRows={({ from, to, count }) => 
+        `${from}-${to} of ${count}`}
+    />
+  </Box>
+)}
         </Container>
       </div>
     </div>

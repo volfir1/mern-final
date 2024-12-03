@@ -54,19 +54,22 @@ const uploadToCloudinary = async (file) => {
 };
 
 // Product APIs
-export const getAllProducts = async () => {
+export const getAllProducts = async (page = 1, limit = 10) => {
   try {
     const token = await getAuthToken();
-    console.log('Fetching all products');
+    console.log('Requesting products:', { page, limit });
     
     const response = await api.get(API_ENDPOINTS.base, {
-      headers: { 'Authorization': `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
+      params: { page, limit }
     });
 
-    console.log('Products fetched successfully:', response.data?.length);
+    console.log('Raw API response:', response);
+    
+    // Return the response directly without transformation
     return response;
   } catch (error) {
-    console.error('Get products error:', error);
+    console.error('ProductApi error:', error);
     throw error;
   }
 };

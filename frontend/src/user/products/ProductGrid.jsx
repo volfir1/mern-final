@@ -32,6 +32,7 @@ const ProductGrid = ({ products, onAddToCart }) => {
     const value = parseInt(newValue, 10);
     if (isNaN(value)) return;
     
+    // Ensure the value is within valid bounds (1-99)
     const quantity = Math.max(1, Math.min(99, value));
     setQuantities(prev => ({
       ...prev,
@@ -167,7 +168,7 @@ const ProductGrid = ({ products, onAddToCart }) => {
                     onClick={() => handleAddToCart(product)}
                     disabled={!product.inStock || isItemLoading}
                   >
-                    {isItemLoading ? 'Adding...' : 'Add to Cart'}
+                    {isItemLoading ? 'Adding...' : product.inStock ? 'Add to Cart' : 'Out of Stock'}
                   </Button>
                 </Box>
               </CardActions>
