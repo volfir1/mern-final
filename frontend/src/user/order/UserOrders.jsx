@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { ArrowBack } from '@mui/icons-material';
+import { Button } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -99,6 +102,7 @@ const UserOrders = () => {
   const [error, setError] = useState(null);
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [page, setPage] = useState(0);
+  const navigate = useNavigate();
   const [rowsPerPage, setRowsPerPage] = useState(5);
 
   useEffect(() => {
@@ -163,20 +167,34 @@ const UserOrders = () => {
 
   return (
     <Box className="container mx-auto px-4 py-8">
-      <Typography variant="h4" component="h1" className="mb-6 font-bold">
-        Your Orders
-      </Typography>
-
-      <TableContainer component={Paper} className="mb-4">
+      <Box className="flex justify-between items-center mb-6">
+        <Typography variant="h4" component="h1" className="font-bold">
+          Your Orders
+        </Typography>
+        <Button
+          variant="outlined"
+          color="primary"
+          onClick={() => navigate('/user/products')}
+          startIcon={<ArrowBack />}
+          className="hover:bg-gray-50"
+        >
+          Back to Products
+        </Button>
+      </Box>
+  
+      <TableContainer 
+        component={Paper} 
+        className="mb-4 shadow-md rounded-lg overflow-hidden"
+      >
         <Table>
-          <TableHead>
+          <TableHead className="bg-gray-50">
             <TableRow>
-              <TableCell />
-              <TableCell>Order Number</TableCell>
-              <TableCell>Date</TableCell>
-              <TableCell>Total</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Payment</TableCell>
+              <TableCell className="w-12" />
+              <TableCell className="font-medium">Order Number</TableCell>
+              <TableCell className="font-medium">Date</TableCell>
+              <TableCell className="font-medium">Total</TableCell>
+              <TableCell className="font-medium">Status</TableCell>
+              <TableCell className="font-medium">Payment</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -184,78 +202,82 @@ const UserOrders = () => {
               .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
               .map((order) => (
                 <React.Fragment key={order._id}>
-                  <TableRow>
+                  <TableRow 
+                    hover 
+                    className="transition-colors cursor-pointer"
+                    onClick={() => setExpandedOrder(expandedOrder === order._id ? null : order._id)}
+                  >
                     <TableCell>
-                      <IconButton
-                        size="small"
-                        onClick={() => setExpandedOrder(expandedOrder === order._id ? null : order._id)}
-                      >
+                      <IconButton size="small">
                         {expandedOrder === order._id ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                       </IconButton>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="subtitle2" className="font-medium">
+                      <Typography variant="subtitle2" className="font-medium text-gray-900">
                         {order.orderNumber}
                       </Typography>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-gray-700">
                       {format(new Date(order.createdAt), 'MMM dd, yyyy')}
                     </TableCell>
-                    <TableCell>₱{order.total.toFixed(2)}</TableCell>
+                    <TableCell className="font-medium text-gray-900">
+                      ₱{order.total.toFixed(2)}
+                    </TableCell>
                     <TableCell>
                       <OrderStatusChip status={order.orderStatus} />
                     </TableCell>
                     <TableCell>
                       <Chip
                         label={order.paymentStatus}
-                        color={order.paymentStatus === 'PAID' ? 'success' : 'default'}
+                        color={order.paymentStatus === 'PAID' ? 'success' : 
+                               order.paymentStatus === 'FAILED' ? 'error' : 'warning'}
+                        variant="outlined"
                         size="small"
+                        className="font-medium"
                       />
                     </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell className="p-0" colSpan={6}>
                       <Collapse in={expandedOrder === order._id} timeout="auto" unmountOnExit>
-                        <Box className="p-4 bg-gray-50">
-                          <Typography variant="h6" className="mb-3">
+                        <Box className="p-6 bg-gray-50 space-y-6">
+                          <Typography variant="h6" className="font-bold text-gray-900">
                             Order Details
                           </Typography>
-                          <Paper variant="outlined" className="mb-4">
+                          <Paper variant="outlined" className="overflow-hidden">
                             {order.items.map((item) => (
                               <OrderItem key={item._id} item={item} />
                             ))}
                           </Paper>
-                          <Box className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Box>
-                              <Typography variant="subtitle2" className="mb-2 font-medium">
+                          <Box className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <Box className="space-y-3">
+                              <Typography variant="subtitle2" className="font-bold text-gray-900">
                                 Shipping Address
                               </Typography>
-                              <Paper variant="outlined" className="p-3">
-                                <Typography variant="body2">
-                                  {order.shippingAddress?.street}
-                                  <br />
-                                  {order.shippingAddress?.barangay}, {order.shippingAddress?.city}
-                                  <br />
+                              <Paper variant="outlined" className="p-4 bg-white">
+                                <Typography variant="body2" className="text-gray-700 leading-relaxed">
+                                  {order.shippingAddress?.street}<br />
+                                  {order.shippingAddress?.barangay}, {order.shippingAddress?.city}<br />
                                   {order.shippingAddress?.province}, {order.shippingAddress?.postalCode}
                                 </Typography>
                               </Paper>
                             </Box>
-                            <Box>
-                              <Typography variant="subtitle2" className="mb-2 font-medium">
+                            <Box className="space-y-3">
+                              <Typography variant="subtitle2" className="font-bold text-gray-900">
                                 Order Summary
                               </Typography>
-                              <Paper variant="outlined" className="p-3">
-                                <Box className="flex justify-between mb-2">
-                                  <Typography variant="body2">Subtotal:</Typography>
-                                  <Typography variant="body2">₱{order.subtotal.toFixed(2)}</Typography>
+                              <Paper variant="outlined" className="p-4 bg-white divide-y divide-gray-200">
+                                <Box className="flex justify-between py-2">
+                                  <Typography variant="body2" className="text-gray-600">Subtotal:</Typography>
+                                  <Typography variant="body2" className="text-gray-900">₱{order.subtotal.toFixed(2)}</Typography>
                                 </Box>
-                                <Box className="flex justify-between mb-2">
-                                  <Typography variant="body2">Shipping:</Typography>
-                                  <Typography variant="body2" className="text-green-600">Free</Typography>
+                                <Box className="flex justify-between py-2">
+                                  <Typography variant="body2" className="text-gray-600">Shipping:</Typography>
+                                  <Typography variant="body2" className="text-green-600 font-medium">Free</Typography>
                                 </Box>
-                                <Box className="flex justify-between font-medium">
-                                  <Typography variant="subtitle2">Total:</Typography>
-                                  <Typography variant="subtitle2">₱{order.total.toFixed(2)}</Typography>
+                                <Box className="flex justify-between pt-2">
+                                  <Typography variant="subtitle2" className="font-bold text-gray-900">Total:</Typography>
+                                  <Typography variant="subtitle2" className="font-bold text-gray-900">₱{order.total.toFixed(2)}</Typography>
                                 </Box>
                               </Paper>
                             </Box>
@@ -269,18 +291,19 @@ const UserOrders = () => {
           </TableBody>
         </Table>
       </TableContainer>
-
+  
       <TablePagination
-        component="div"
+        component={Paper}
         count={orders.length}
         page={page}
         onPageChange={handleChangePage}
         rowsPerPage={rowsPerPage}
         onRowsPerPageChange={handleChangeRowsPerPage}
         rowsPerPageOptions={[5, 10, 25]}
+        className="shadow-sm"
       />
     </Box>
   );
-};
+}; // Close UserOrders component
 
-export default UserOrders;
+export default UserOrders; // Export component

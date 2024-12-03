@@ -163,7 +163,7 @@ export const getOrderById = async (req, res) => {
 export const updateOrderStatus = async (req, res) => {
     try {
         const { orderId } = req.params;
-        const { status, note } = req.body;
+        const { orderStatus: status, note } = req.body;
 
         const order = await Order.findById(orderId);
         if (!order) {
@@ -173,8 +173,28 @@ export const updateOrderStatus = async (req, res) => {
             });
         }
 
+        // Update order status
         order.orderStatus = status;
         order._statusNote = note;
+
+        // Update payment status based on order status
+        switch (status) {
+            case 'DELIVERED':
+                order.paymentStatus = 'PAID';
+                break;
+            case 'CANCELLED':
+                order.paymentStatus = 'FAILED';
+                break;
+            case 'PENDING':
+            case 'PROCESSING':
+            case 'SHIPPED':
+                // Only update payment status to PENDING if it's not already PAID
+                if (order.paymentStatus !== 'PAID') {
+                    order.paymentStatus = 'PENDING';
+                }
+                break;
+        }
+
         await order.save();
 
         res.status(200).json({
