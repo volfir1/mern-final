@@ -11,6 +11,11 @@ const reviewSchema = new mongoose.Schema({
     ref: 'Product',
     required: [true, 'Product is required']
   },
+  order: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Order',
+    required: [true, 'Order is required']
+  },
   rating: {
     type: Number,
     required: [true, 'Rating is required'],
@@ -39,9 +44,7 @@ const reviewSchema = new mongoose.Schema({
 });
 
 // Compound index to ensure one review per user per product
-reviewSchema.index({ user: 1, product: 1 }, { unique: true });
-
-// Update product's average rating when review is added/modified
+reviewSchema.index({ user: 1, product: 1, order: 1 }, { unique: true });// Update product's average rating when review is added/modified
 reviewSchema.post('save', async function() {
   const productId = this.product;
   const Product = mongoose.model('Product');

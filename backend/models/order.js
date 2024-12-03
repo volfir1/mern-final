@@ -10,7 +10,11 @@ const orderItemSchema = new mongoose.Schema({
   name: String,
   price: Number,
   quantity: Number,
-  subtotal: Number
+  subtotal: Number,
+  userReview: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Review'
+  }
 });
 
 const orderSchema = new mongoose.Schema({

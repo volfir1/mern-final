@@ -67,4 +67,12 @@ router.all('*', (req, res) => {
   });
 });
 
+router.get('/users/count', protect, authorize('admin'), async (req, res) => {
+  try {
+    const count = await UserAuth.countDocuments();
+    res.json({ count });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 export default router;

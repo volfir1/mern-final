@@ -677,3 +677,30 @@ export const deleteProduct = async (req, res) => {
     });
   }
 };
+
+
+export const getProductWithReviews = async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    const reviews = await Review.find({ product: product._id })
+      .populate('user', 'displayName photoURL')
+      .sort('-createdAt')
+      .limit(5); // Get latest 5 reviews
+
+    res.json({
+      success: true,
+      data: {
+        ...product.toObject(),
+        reviews,
+        rating: product.rating || 0,
+        numReviews: product.numReviews || 0
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

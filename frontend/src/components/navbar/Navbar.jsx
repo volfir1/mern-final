@@ -425,6 +425,9 @@ const Navbar = () => {
             <Link to="/user/orders" className="text-gray-700 hover:text-blue-600 px-3 py-2">
                Your Orders
             </Link>
+            <Link to="/user/reviews" className="text-gray-700 hover:text-blue-600 px-3 py-2">
+               Review Products
+            </Link>
            
           </div>
 

@@ -122,12 +122,26 @@ export const useOrderApi = () => {
     }
   };
 
+  const createReview = async (data) => {
+    try {
+      const response = await api.post('/orders/reviews', {
+        productId: data.productId,
+        rating: data.rating,
+        comment: data.comment
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Create review error:', error);
+      throw error;
+    }
+  };
   return {
     getAllOrders,
     getUserOrders,
     getOrderById,
     updateOrderStatus,
-    createOrder
+    createOrder,
+    createReview
   };
 };
 
