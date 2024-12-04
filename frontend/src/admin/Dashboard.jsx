@@ -188,14 +188,14 @@ const SalesDashboard = () => {
             <h2 className="text-2xl font-semibold text-gray-800 mb-6">Monthly Sales Overview</h2>
             <div className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="sales" stroke="#3b82f6" name="Sales (₱)" />
-                </LineChart>
+              <LineChart data={monthlyData}>
+  <CartesianGrid strokeDasharray="3 3" />
+  <XAxis dataKey="name" />
+  <YAxis />
+  <Tooltip />
+  <Legend />
+  <Line type="monotone" dataKey="sales" stroke="#3b82f6" name="Sales (₱)" />
+</LineChart>
               </ResponsiveContainer>
             </div>
           </div>
@@ -228,15 +228,15 @@ const SalesDashboard = () => {
             </div>
             <div className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={filteredData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="sales" stroke="#34D399" name="Sales (₱)" />
-                  <Line type="monotone" dataKey="orders" stroke="#F97316" name="Orders" />
-                </LineChart>
+              <LineChart data={filteredData}>
+  <CartesianGrid strokeDasharray="3 3" />
+  <XAxis dataKey="name" />
+  <YAxis />
+  <Tooltip />
+  <Legend />
+  <Line type="monotone" dataKey="sales" stroke="#34D399" name="Sales (₱)" />
+  <Line type="monotone" dataKey="orders" stroke="#F97316" name="Orders" />
+</LineChart>
               </ResponsiveContainer>
             </div>
           </div>

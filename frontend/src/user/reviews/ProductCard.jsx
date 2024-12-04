@@ -1,18 +1,19 @@
-// src/components/ProductCard.jsx
-
 import React, { useMemo } from 'react';
 import { Card, CardMedia, CardContent, Typography, Button, Box, Rating, Skeleton } from '@mui/material';
 import PropTypes from 'prop-types';
 import { Edit, Star } from '@mui/icons-material';
+import filter from 'leo-profanity';
+
+// Initialize the filter (you might want to do this in your app's entry point instead)
+filter.loadDictionary();
 
 const ProductCard = ({ 
   product, 
   onReview, 
   isReviewed, 
-  submitting = false, // Default parameter
+  submitting = false,
   loading = false 
 }) => {
-  // Return loading skeleton if loading
   if (loading) {
     return (
       <Card className="h-full">
@@ -26,10 +27,8 @@ const ProductCard = ({
     );
   }
 
-  // Return null if no product data
   if (!product) return null;
 
-  // Memoize image URL processing
   const imageUrl = useMemo(() => {
     if (!Array.isArray(product.images) || product.images.length === 0) {
       return '/placeholder.jpg';
@@ -38,15 +37,18 @@ const ProductCard = ({
     return typeof firstImage === 'string' ? firstImage : firstImage?.url || '/placeholder.jpg';
   }, [product.images]);
 
-  // Memoize review data
-  const reviewData = useMemo(() => ({
-    rating: product.userReview?.rating || 0,
-    comment: product.userReview?.comment || ''
-  }), [product.userReview]);
+  // Memoize review data with profanity filter
+  const reviewData = useMemo(() => {
+    const rawComment = product.userReview?.comment || '';
+    return {
+      rating: product.userReview?.rating || 0,
+      // Apply profanity filter to the comment
+      comment: filter.clean(rawComment)
+    };
+  }, [product.userReview]);
 
   return (
     <Card className="h-full flex flex-col hover:shadow-lg transition-shadow duration-200">
-      {/* Product Image with error handling */}
       <Box className="relative pt-[75%]">
         <CardMedia
           component="img"
@@ -61,7 +63,6 @@ const ProductCard = ({
       </Box>
 
       <CardContent className="flex-grow flex flex-col">
-        {/* Product Name */}
         <Typography 
           variant="h6" 
           component="h2" 
@@ -71,7 +72,6 @@ const ProductCard = ({
           {product.name}
         </Typography>
 
-        {/* Review Section */}
         <Box className="mt-auto space-y-3">
           {isReviewed ? (
             <>
@@ -105,7 +105,7 @@ const ProductCard = ({
                 fullWidth
                 startIcon={<Edit size={16} />}
                 className="mt-2"
-                disabled={submitting} // Disable while submitting
+                disabled={submitting}
               >
                 {submitting ? 'Updating...' : 'Edit Review'}
               </Button>
@@ -117,7 +117,7 @@ const ProductCard = ({
               onClick={() => onReview(product)}
               fullWidth
               className="mt-2"
-              disabled={submitting} // Disable while submitting
+              disabled={submitting}
             >
               {submitting ? 'Submitting...' : 'Write Review'}
             </Button>

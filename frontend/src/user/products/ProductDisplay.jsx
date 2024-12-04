@@ -41,7 +41,9 @@ import { useReviewApi } from "@/api/reviewApi";
 import { useAuth } from "@/utils/authContext";
 import Navbar from "@/components/navbar/Navbar";
 import ErrorBoundary from "@/utils/errorBoundary";
+import filter from 'leo-profanity';
 
+filter.loadDictionary();
 // ReviewStars Component
 const ReviewStars = memo(({ rating }) => (
   <Box className="flex items-center">
@@ -111,7 +113,10 @@ const ReviewModal = memo(({ open, onClose, product, reviews = [], loading = fals
   const handleEditSubmit = async (reviewData) => {
     try {
       setSubmitting(true);
-      const response = await reviewApi.updateReview(editingReview._id, reviewData);
+      const response = await reviewApi.updateReview(editingReview._id, {
+        ...reviewData,
+        comment: filter.clean(reviewData.comment)
+      });
       
       if (response.success) {
         const updatedReviews = reviews.map(review => 
@@ -207,7 +212,7 @@ const EditReviewDialog = memo(({ open, onClose, review, onUpdate }) => {
       setLoading(true);
       const response = await reviewApi.updateReview(review._id, {
         rating: editedReview.rating,
-        comment: editedReview.comment,
+        comment: filter.clean(editedReview.comment),
       });
       if (response.success) {
         toast.success("Review updated successfully");
@@ -224,46 +229,25 @@ const EditReviewDialog = memo(({ open, onClose, review, onUpdate }) => {
     }
   };
 
-  if (!review) return null;
 
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{
-        className: "rounded-none border-t-4 border-indigo-500",
-      }}
-    >
+  return review ? (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{className: "rounded-none border-t-4 border-indigo-500"}}>
       <DialogTitle className="bg-slate-50 border-b border-slate-200">
-  <Typography
-    component="div" // Change from h6 to div
-    variant="h6"
-    className="font-sans font-medium tracking-wide"
-  >
-    Edit Your Review
-  </Typography>
-</DialogTitle>
+        <Typography component="div" variant="h6" className="font-sans font-medium tracking-wide">
+          Edit Your Review
+        </Typography>
+      </DialogTitle>
       <DialogContent className="py-6">
         <Box className="space-y-6">
           <Box className="flex flex-col gap-2">
-            <Typography className="text-slate-600 font-medium">
-              Rating
-            </Typography>
+            <Typography className="text-slate-600 font-medium">Rating</Typography>
             <Rating
               name="rating"
               value={editedReview.rating}
-              onChange={(_, newValue) => {
-                setEditedReview((prev) => ({ ...prev, rating: newValue }));
-              }}
+              onChange={(_, newValue) => setEditedReview(prev => ({ ...prev, rating: newValue }))}
               sx={{
-                "& .MuiRating-iconFilled": {
-                  color: "#6366f1",
-                },
-                "& .MuiRating-iconEmpty": {
-                  color: "#e2e8f0",
-                },
+                "& .MuiRating-iconFilled": { color: "#6366f1" },
+                "& .MuiRating-iconEmpty": { color: "#e2e8f0" }
               }}
             />
           </Box>
@@ -273,31 +257,20 @@ const EditReviewDialog = memo(({ open, onClose, review, onUpdate }) => {
             rows={4}
             label="Your Review"
             value={editedReview.comment}
-            onChange={(e) => {
-              setEditedReview((prev) => ({ ...prev, comment: e.target.value }));
-            }}
+            onChange={(e) => setEditedReview(prev => ({ ...prev, comment: e.target.value }))}
             className="bg-white"
             sx={{
               "& .MuiOutlinedInput-root": {
                 borderRadius: "0",
-                "&:hover fieldset": {
-                  borderColor: "#6366f1",
-                },
-                "&.Mui-focused fieldset": {
-                  borderColor: "#6366f1",
-                  borderWidth: "2px",
-                },
-              },
+                "&:hover fieldset": { borderColor: "#6366f1" },
+                "&.Mui-focused fieldset": { borderColor: "#6366f1", borderWidth: "2px" }
+              }
             }}
           />
         </Box>
       </DialogContent>
       <DialogActions className="border-t border-slate-200 bg-slate-50 p-4">
-        <Button
-          onClick={onClose}
-          disabled={loading}
-          className="text-slate-600 hover:text-slate-800"
-        >
+        <Button onClick={onClose} disabled={loading} className="text-slate-600 hover:text-slate-800">
           Cancel
         </Button>
         <Button
@@ -306,15 +279,11 @@ const EditReviewDialog = memo(({ open, onClose, review, onUpdate }) => {
           disabled={loading}
           className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-none normal-case"
         >
-          {loading ? (
-            <CircularProgress size={24} className="text-white" />
-          ) : (
-            "Save Changes"
-          )}
+          {loading ? <CircularProgress size={24} className="text-white" /> : "Save Changes"}
         </Button>
       </DialogActions>
     </Dialog>
-  );
+  ) : null;
 });
 
 // ProductGridSkeleton Component
