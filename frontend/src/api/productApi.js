@@ -56,22 +56,59 @@ const uploadToCloudinary = async (file) => {
 };
 
 // Product APIs
-export const getAllProducts = async (page = 1, limit = 10) => {
+export const getAllProducts = async (params = {}) => {
   try {
     const token = await getAuthToken();
-    console.log('Requesting products:', { page, limit });
-    
+    const {
+      page = 1,
+      limit = 10,
+      sort = 'createdAt',
+      order = 'desc',
+      search = '',
+      minPrice,
+      maxPrice,
+      category,
+      inStock
+    } = params;
+
+    console.log('Requesting products with params:', params);
+
+    // Construct query parameters
+    const queryParams = {
+      page,
+      limit,
+      sort,
+      order,
+      ...(search && { search }),
+      ...(minPrice && { minPrice }),
+      ...(maxPrice && { maxPrice }),
+      ...(category && { category }),
+      ...(inStock !== undefined && { inStock })
+    };
+
     const response = await api.get(API_ENDPOINTS.base, {
       headers: { Authorization: `Bearer ${token}` },
-      params: { page, limit }
+      params: queryParams
     });
 
-    console.log('Raw API response:', response);
-    
-    // Return the response directly without transformation
+    // Validate response
+    if (!response?.data) {
+      throw new Error('Invalid API response format');
+    }
+
+    console.log('Products fetched successfully:', {
+      count: response.data.data?.length,
+      total: response.data.total,
+      pages: response.data.pages
+    });
+
     return response;
   } catch (error) {
-    console.error('ProductApi error:', error);
+    console.error('ProductApi error:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data
+    });
     throw error;
   }
 };

@@ -1,5 +1,3 @@
-// src/user/products/ProductDisplay.jsx
-
 import React, { useState, useEffect, useCallback, Suspense, memo } from "react";
 import {
   Container,
@@ -24,79 +22,77 @@ import {
   IconButton,
   Rating,
   CardMedia,
-  Avatar, // Added Avatar
+  Avatar,
 } from "@mui/material";
 import {
   Close as CloseIcon,
   Star as StarIcon,
-  Edit as EditIcon, // Added EditIcon
-  MoreVert as MoreVertIcon, // Added MoreVertIcon if needed
+  Edit as EditIcon,
+  MoreVert as MoreVertIcon,
+  Search as SearchIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { debounce } from "lodash";
-import { format } from "date-fns"; // Added format
-import { productApi } from "@/api/productApi"; // Ensure this path is correct
-import { cartApi } from "@/api/cartApi"; // Ensure this path is correct
-import { useReviewApi } from "@/api/reviewApi"; // Added useReviewApi
-import { useAuth } from "@/utils/authContext"; // Ensure the correct import path
-import Navbar from "@/components/navbar/Navbar"; // Ensure this path is correct
-import ErrorBoundary from "@/utils/errorBoundary"; // Ensure this path is correct
+import { format } from "date-fns";
+import { productApi } from "@/api/productApi";
+import { cartApi } from "@/api/cartApi";
+import { useReviewApi } from "@/api/reviewApi";
+import { useAuth } from "@/utils/authContext";
+import Navbar from "@/components/navbar/Navbar";
+import ErrorBoundary from "@/utils/errorBoundary";
 
-
-
-// **ReviewStars Component**
+// ReviewStars Component
 const ReviewStars = memo(({ rating }) => (
-  <Box display="flex" alignItems="center">
+  <Box className="flex items-center">
     <Rating
       value={rating}
       readOnly
       precision={0.5}
       size="small"
+      sx={{
+        "& .MuiRating-iconFilled": {
+          color: "#6366f1",
+        },
+        "& .MuiRating-iconEmpty": {
+          color: "#e2e8f0",
+        },
+      }}
       emptyIcon={<StarIcon style={{ opacity: 0.55 }} fontSize="inherit" />}
     />
   </Box>
 ));
 
-// **ReviewCard Component**
+// ReviewCard Component
 const ReviewCard = memo(({ review, onEdit }) => (
-  <Box
-    sx={{
-      mb: 3,
-      p: 2,
-      bgcolor: "background.paper",
-      borderRadius: 1,
-      boxShadow: 1,
-    }}
-  >
-    <Box
-      display="flex"
-      justifyContent="space-between"
-      alignItems="start"
-      mb={1}
-    >
-      <Box display="flex" alignItems="center" gap={1}>
+  <Box className="mb-6 p-4 bg-white rounded-none border-l-4 border-indigo-500 shadow-sm">
+    <Box className="flex justify-between items-start mb-3">
+      <Box className="flex items-center gap-3">
         <Avatar
           src={review.user?.photoURL}
           alt={review.user?.displayName}
-          sx={{ width: 32, height: 32 }}
+          className="w-8 h-8 bg-indigo-100"
         >
           {review.user?.displayName?.charAt(0) || "U"}
         </Avatar>
         <Box>
-          <Typography variant="subtitle2" gutterBottom>
+          <Typography
+            variant="subtitle2"
+            className="font-sans font-medium tracking-wide"
+          >
             {review.user?.displayName || "Anonymous"}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="caption" className="text-slate-600">
             Order #{review.order?.orderNumber} •{" "}
             {format(new Date(review.createdAt), "MMM dd, yyyy")}
           </Typography>
         </Box>
       </Box>
-      {review.user?._id === review.order?.userId && ( // Ensure `review.order.userId` correctly references the order owner
+      {review.user?._id === review.order?.userId && (
         <Button
           size="small"
           startIcon={<EditIcon />}
+          className="text-indigo-600 hover:text-indigo-800"
           onClick={() => onEdit(review)}
         >
           Edit
@@ -104,70 +100,75 @@ const ReviewCard = memo(({ review, onEdit }) => (
       )}
     </Box>
     <ReviewStars rating={review.rating} />
-    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+    <Typography variant="body2" className="mt-3 text-slate-700 leading-relaxed">
       {review.comment}
     </Typography>
   </Box>
 ));
 
-// **ReviewModal Component with Edit Functionality**
-const ReviewModal = memo(({ open, onClose, product, reviews = [], loading = false, onEditReview }) => {
-  console.log('ReviewModal render with:', {
-    open,
-    product,
-    reviewsLength: reviews?.length,
-    reviews,
-    loading
-  });
+// ReviewModal Component
+const ReviewModal = memo(
+  ({ open, onClose, product, reviews = [], loading = false, onEditReview }) => {
+    return (
+      <Dialog
+        open={open}
+        onClose={onClose}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          className: "rounded-none border-t-4 border-indigo-500",
+        }}
+      >
+        <DialogTitle className="bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+          <Typography
+            variant="h6"
+            className="font-sans font-medium tracking-wide"
+          >
+            Reviews for {product?.name}
+          </Typography>
+          <IconButton
+            onClick={onClose}
+            className="text-slate-500 hover:text-slate-700"
+            edge="end"
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent className="py-6">
+          {loading ? (
+            <Box className="flex justify-center p-8">
+              <CircularProgress className="text-indigo-500" />
+            </Box>
+          ) : reviews?.length > 0 ? (
+            <Box className="space-y-4">
+              {reviews.map((review) => (
+                <ReviewCard
+                  key={review._id}
+                  review={review}
+                  onEdit={onEditReview}
+                />
+              ))}
+            </Box>
+          ) : (
+            <Box className="py-12 text-center">
+              <Typography className="text-slate-500">No reviews yet</Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions className="border-t border-slate-200 bg-slate-50">
+          <Button
+            onClick={onClose}
+            className="text-slate-700 hover:text-slate-900"
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+    );
+  }
+);
 
-  return (
-    <Dialog 
-      open={open} 
-      onClose={onClose}
-      maxWidth="md" 
-      fullWidth
-      scroll="paper"
-    >
-      <DialogTitle>
-        Reviews for {product?.name}
-        <IconButton 
-          aria-label="close" 
-          onClick={onClose}
-          sx={{ position: 'absolute', right: 8, top: 8 }}
-        >
-          <CloseIcon />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent dividers>
-        {loading ? (
-          <Box display="flex" justifyContent="center" p={3}>
-            <CircularProgress />
-          </Box>
-        ) : reviews && reviews.length > 0 ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {reviews.map((review) => (
-              <ReviewCard 
-                key={review._id} 
-                review={review}
-                onEdit={onEditReview}
-              />
-            ))}
-          </Box>
-        ) : (
-          <Box py={4} textAlign="center">
-            <Typography color="text.secondary">
-              {loading ? 'Loading reviews...' : 'No reviews yet'}
-            </Typography>
-          </Box>
-        )}
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Close</Button>
-      </DialogActions>
-    </Dialog>
-  );
-});
-// **EditReviewDialog Component**
+// EditReviewDialog Component
 const EditReviewDialog = memo(({ open, onClose, review, onUpdate }) => {
   const [editedReview, setEditedReview] = useState({ rating: 0, comment: "" });
   const [loading, setLoading] = useState(false);
@@ -188,7 +189,7 @@ const EditReviewDialog = memo(({ open, onClose, review, onUpdate }) => {
       });
       if (response.success) {
         toast.success("Review updated successfully");
-        onUpdate(response.data); // Assuming response.data contains the updated review
+        onUpdate(response.data);
         onClose();
       } else {
         throw new Error(response.message || "Failed to update review");
@@ -204,17 +205,45 @@ const EditReviewDialog = memo(({ open, onClose, review, onUpdate }) => {
   if (!review) return null;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Edit Your Review</DialogTitle>
-      <DialogContent>
-        <Box sx={{ pt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
-          <Rating
-            name="rating"
-            value={editedReview.rating}
-            onChange={(_, newValue) => {
-              setEditedReview((prev) => ({ ...prev, rating: newValue }));
-            }}
-          />
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        className: "rounded-none border-t-4 border-indigo-500",
+      }}
+    >
+      <DialogTitle className="bg-slate-50 border-b border-slate-200">
+        <Typography
+          variant="h6"
+          className="font-sans font-medium tracking-wide"
+        >
+          Edit Your Review
+        </Typography>
+      </DialogTitle>
+      <DialogContent className="py-6">
+        <Box className="space-y-6">
+          <Box className="flex flex-col gap-2">
+            <Typography className="text-slate-600 font-medium">
+              Rating
+            </Typography>
+            <Rating
+              name="rating"
+              value={editedReview.rating}
+              onChange={(_, newValue) => {
+                setEditedReview((prev) => ({ ...prev, rating: newValue }));
+              }}
+              sx={{
+                "& .MuiRating-iconFilled": {
+                  color: "#6366f1",
+                },
+                "& .MuiRating-iconEmpty": {
+                  color: "#e2e8f0",
+                },
+              }}
+            />
+          </Box>
           <TextField
             fullWidth
             multiline
@@ -224,32 +253,62 @@ const EditReviewDialog = memo(({ open, onClose, review, onUpdate }) => {
             onChange={(e) => {
               setEditedReview((prev) => ({ ...prev, comment: e.target.value }));
             }}
+            className="bg-white"
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "0",
+                "&:hover fieldset": {
+                  borderColor: "#6366f1",
+                },
+                "&.Mui-focused fieldset": {
+                  borderColor: "#6366f1",
+                  borderWidth: "2px",
+                },
+              },
+            }}
           />
         </Box>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} disabled={loading}>
+      <DialogActions className="border-t border-slate-200 bg-slate-50 p-4">
+        <Button
+          onClick={onClose}
+          disabled={loading}
+          className="text-slate-600 hover:text-slate-800"
+        >
           Cancel
         </Button>
-        <Button variant="contained" onClick={handleSave} disabled={loading}>
-          {loading ? <CircularProgress size={24} /> : "Save Changes"}
+        <Button
+          variant="contained"
+          onClick={handleSave}
+          disabled={loading}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-none normal-case"
+        >
+          {loading ? (
+            <CircularProgress size={24} className="text-white" />
+          ) : (
+            "Save Changes"
+          )}
         </Button>
       </DialogActions>
     </Dialog>
   );
 });
 
-// **ProductGridSkeleton Component (Skeleton Loading State)**
+// ProductGridSkeleton Component
 const ProductGridSkeleton = memo(() => (
-  <Grid container spacing={3}>
+  <Grid container spacing={4}>
     {[...Array(6)].map((_, index) => (
       <Grid item key={index} xs={12} sm={6} md={4}>
-        <Card>
-          <Skeleton variant="rectangular" height={200} />
-          <Box sx={{ p: 2 }}>
-            <Skeleton width="60%" />
-            <Skeleton width="40%" />
-            <Skeleton width="20%" />
+        <Card className="rounded-none border-t-4 border-slate-200">
+          <Skeleton
+            variant="rectangular"
+            height={240}
+            className="bg-slate-100"
+          />
+          <Box className="p-4 space-y-2">
+            <Skeleton width="60%" height={28} className="bg-slate-100" />
+            <Skeleton width="40%" height={20} className="bg-slate-100" />
+            <Skeleton width="20%" height={20} className="bg-slate-100" />
           </Box>
         </Card>
       </Grid>
@@ -257,109 +316,102 @@ const ProductGridSkeleton = memo(() => (
   </Grid>
 ));
 
-// **LoadingSpinner Component**
+// LoadingSpinner Component
 const LoadingSpinner = memo(() => (
-  <Box display="flex" justifyContent="center" py={4}>
-    <CircularProgress size={40} />
+  <Box className="flex justify-center py-12">
+    <CircularProgress size={40} className="text-indigo-500" />
   </Box>
 ));
 
-// **EmptyState Component**
+// EmptyState Component
 const EmptyState = memo(() => (
-  <Box
-    display="flex"
-    flexDirection="column"
-    alignItems="center"
-    justifyContent="center"
-    minHeight="60vh"
-  >
-    <Typography variant="h6" color="text.secondary" gutterBottom>
+  <Box className="flex flex-col items-center justify-center min-h-[400px] py-12">
+    <Typography variant="h6" className="text-slate-600 font-medium mb-2">
       No products found
     </Typography>
-    <Typography variant="body2" color="text.secondary">
+    <Typography variant="body2" className="text-slate-500">
       Try adjusting your search or filters
     </Typography>
   </Box>
 ));
 
-// **ProductGrid Component**
+// ProductGrid Component
 const ProductGrid = memo(
   ({ products, onAddToCart, reviews, loadingReviews, onOpenReviews }) => {
-    console.log("ProductGrid received products:", products); // Debug log
-
     if (!products || products.length === 0) {
       return <EmptyState />;
     }
 
     return (
-      <Grid container spacing={3}>
-        {products.map((product) => {
-          console.log("Rendering product:", product); // Debug log
-          return (
-            <Grid item key={product._id} xs={12} sm={6} md={4}>
-              <Card>
-                <CardMedia
-                  component="img"
-                  height="200"
-                  image={
-                    product.images?.[0]?.url ||
-                    product.imageUrl ||
-                    "https://via.placeholder.com/200"
-                  }
-                  alt={product.name}
-                />
-                <Box sx={{ p: 2 }}>
-                  <Typography variant="h6" component="div" gutterBottom>
-                    {product.name}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {product.description?.substring(0, 100) ||
-                      "No description available"}
-                    {product.description?.length > 100 ? "..." : ""}
-                  </Typography>
-                  <Typography
-                    variant="subtitle1"
-                    color="text.primary"
-                    sx={{ mt: 1 }}
+      <Grid container spacing={4}>
+        {products.map((product) => (
+          <Grid item key={product._id} xs={12} sm={6} md={4}>
+            <Card className="rounded-none hover:shadow-lg transition-shadow duration-300 border-t-4 border-indigo-500">
+              <CardMedia
+                component="img"
+                height="240"
+                image={
+                  product.images?.[0]?.url ||
+                  product.imageUrl ||
+                  "https://via.placeholder.com/400"
+                }
+                alt={product.name}
+                className="object-cover h-60"
+              />
+              <Box className="p-4 space-y-3">
+                <Typography
+                  variant="h6"
+                  className="font-sans font-medium tracking-wide text-slate-800"
+                >
+                  {product.name}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  className="text-slate-600 line-clamp-2"
+                >
+                  {product.description?.substring(0, 100) ||
+                    "No description available"}
+                  {product.description?.length > 100 ? "..." : ""}
+                </Typography>
+                <Typography
+                  variant="h6"
+                  className="text-indigo-600 font-medium"
+                >
+                  ₱{Number(product.price).toFixed(2)}
+                </Typography>
+                <Box className="flex justify-between pt-2">
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => onOpenReviews(product)}
+                    className="rounded-none text-indigo-600 border-indigo-600 hover:border-indigo-700 hover:bg-indigo-50 normal-case"
                   >
-                    ₱{Number(product.price).toFixed(2)}
-                  </Typography>
-                  <Box
-                    display="flex"
-                    justifyContent="space-between"
-                    sx={{ mt: 2 }}
+                    Reviews ({(reviews[product._id] || []).length})
+                  </Button>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={() => onAddToCart(product, 1)}
+                    className="rounded-none bg-indigo-600 hover:bg-indigo-700 normal-case"
                   >
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={() => onOpenReviews(product)}
-                    >
-                      View Reviews ({(reviews[product._id] || []).length})
-                    </Button>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      onClick={() => onAddToCart(product, 1)}
-                    >
-                      Add to Cart
-                    </Button>
-                  </Box>
+                    Add to Cart
+                  </Button>
                 </Box>
-              </Card>
-            </Grid>
-          );
-        })}
+              </Box>
+            </Card>
+          </Grid>
+        ))}
       </Grid>
     );
   }
 );
 
-// **ProductDisplay Component**
+// Main ProductDisplay Component
 const ProductDisplay = () => {
-
-
   const navigate = useNavigate();
-  const { user } = useAuth(); // Get current user
+  const { user } = useAuth();
+
+  // State Management
   const [state, setState] = useState({
     products: [],
     loading: false,
@@ -381,74 +433,64 @@ const ProductDisplay = () => {
     loadingReviews: {},
   });
 
-  // **New State Variables**
-  const [selectedProduct, setSelectedProduct] = useState(null); // State for selected product
-  const [reviewModalOpen, setReviewModalOpen] = useState(false); // State for Reviews Modal
-  const [editReview, setEditReview] = useState(null); // State for editing reviews
-  const [editModalOpen, setEditModalOpen] = useState(false); // State for Edit Review Modal
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [editReview, setEditReview] = useState(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
-  // Update state with functional updates to avoid stale closures
+  // Update state utility function
   const updateState = (updates) => {
     setState((prev) => ({ ...prev, ...updates }));
   };
 
-  // **Fetch Products**
+  // Fetch Products with improved pagination
   const fetchProducts = useCallback(
     async (params = {}) => {
       try {
-        console.log("Fetching products with params:", params);
         updateState({ loading: true, error: null });
 
+        // Fix pagination parameters
         const queryParams = {
-          page: params.page !== undefined ? params.page + 1 : state.page + 1, // Assuming backend uses 1-based page indexing
+          page: (params.page ?? state.page) + 1, // Convert to 1-based for API
           limit: params.limit || state.rowsPerPage,
           sort: state.sortBy,
           order: state.sortOrder,
           search: state.searchTerm,
           ...state.filters,
-          ...params,
         };
 
-        console.log("Query Parameters:", queryParams);
+        console.log("Fetching products with params:", queryParams);
 
         const response = await productApi.getAllProducts(queryParams);
-        console.log("Raw API response:", response); // Debug log
 
-        // Check for response structure
-        if (!response || !response.data) {
-          throw new Error("Invalid API response structure");
+        if (response?.data?.success) {
+          const { data, total, pages } = response.data;
+
+          updateState({
+            products: Array.isArray(data) ? data : [],
+            totalProducts: total,
+            totalPages: pages,
+            page: params.page ?? state.page,
+            loading: false,
+            error: null,
+          });
+
+          // Fetch reviews for new products
+          if (Array.isArray(data)) {
+            data.forEach((product) => fetchReviews(product._id));
+          }
+        } else {
+          throw new Error("Invalid API response");
         }
-
-        const { data, total, pages } = response.data;
-
-        if (!Array.isArray(data)) {
-          console.error("API returned invalid data format:", data);
-          throw new Error("Invalid data format received");
-        }
-
+      } catch (error) {
+        console.error("Fetch Products Error:", error);
         updateState({
-          products: data,
-          totalProducts: total || data.length,
-          totalPages: pages || Math.ceil(data.length / state.rowsPerPage),
-          page: params.page !== undefined ? params.page : state.page,
-          error: null,
-        });
-
-        console.log(`Successfully loaded ${data.length} products`);
-
-        // Optionally, fetch reviews when products are fetched
-        // Uncomment the following line if you want to fetch reviews on initial load
-        // data.forEach((product) => fetchReviews(product._id));
-      } catch (err) {
-        console.error("Fetch Products Error:", err);
-        updateState({
-          error: err.message || "Failed to load products",
+          error: error.message || "Failed to load products",
           products: [],
           totalProducts: 0,
           totalPages: 1,
+          loading: false,
         });
-      } finally {
-        updateState({ loading: false });
       }
     },
     [
@@ -457,141 +499,107 @@ const ProductDisplay = () => {
       state.sortOrder,
       state.searchTerm,
       state.filters,
+      state.page,
     ]
   );
 
-  // **Fetch Reviews for a Specific Product**
+  // Fetch Reviews
   const fetchReviews = useCallback(async (productId) => {
     try {
-      console.log('Starting fetchReviews for:', productId);
-      
-      // Update loading state
-      setState(prev => {
-        console.log('Setting loading state:', { 
-          ...prev.loadingReviews, 
-          [productId]: true 
-        });
-        return {
-          ...prev,
-          loadingReviews: { 
-            ...prev.loadingReviews, 
-            [productId]: true 
-          }
-        };
-      });
-  
-      // Fetch the reviews
+      setState((prev) => ({
+        ...prev,
+        loadingReviews: { ...prev.loadingReviews, [productId]: true },
+      }));
+
       const response = await productApi.getProductReviews(productId);
-      console.log('API Response for reviews:', response);
-  
-      // Update reviews in state
-      setState(prev => {
-        const updatedState = {
-          ...prev,
-          reviews: {
-            ...prev.reviews,
-            [productId]: response // Store the raw response
-          },
-          loadingReviews: {
-            ...prev.loadingReviews,
-            [productId]: false
-          }
-        };
-        console.log('Updated state after fetching reviews:', updatedState);
-        return updatedState;
-      });
-  
+
+      setState((prev) => ({
+        ...prev,
+        reviews: {
+          ...prev.reviews,
+          [productId]: response,
+        },
+        loadingReviews: {
+          ...prev.loadingReviews,
+          [productId]: false,
+        },
+      }));
     } catch (error) {
-      console.error('Error fetching reviews:', error);
-      setState(prev => ({
+      console.error("Error fetching reviews:", error);
+      setState((prev) => ({
         ...prev,
         loadingReviews: {
           ...prev.loadingReviews,
-          [productId]: false
-        }
+          [productId]: false,
+        },
       }));
     }
   }, []);
-  const handleViewReviews = useCallback(async (product) => {
-    setSelectedProduct(product);
-    setReviewModalOpen(true);
-    await fetchReviews(product._id);
-  }, [fetchReviews]);
 
-  // **Debounced Search to Limit API Calls**
+  // Debounced Search
   const debouncedSearch = useCallback(
     debounce((term) => {
-      console.log("Debounced Search Term:", term);
       updateState({ searchTerm: term, page: 0 });
       fetchProducts({ page: 0 });
     }, 500),
     [fetchProducts]
   );
 
-  // **Initial Fetch on Component Mount**
+  // Initial Fetch
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
-  // **Handle Page Change for Pagination**
-  const handleChangePage = (_, newPage) => {
+  // Pagination Handlers with Fix
+  const handleChangePage = (event, newPage) => {
     console.log("Changing to page:", newPage);
+    updateState({ page: newPage });
     fetchProducts({ page: newPage });
   };
 
-  // **Handle Rows Per Page Change**
   const handleChangeRowsPerPage = (event) => {
     const newRowsPerPage = parseInt(event.target.value, 10);
     console.log("Changing rows per page to:", newRowsPerPage);
-    updateState({ rowsPerPage: newRowsPerPage, page: 0 });
-    fetchProducts({ page: 0, limit: newRowsPerPage });
+    updateState({
+      rowsPerPage: newRowsPerPage,
+      page: 0, // Reset to first page when changing items per page
+    });
+    fetchProducts({
+      page: 0,
+      limit: newRowsPerPage,
+    });
   };
 
-  // **Handle Sorting**
+  // Other Handlers
   const handleSort = (event) => {
-    const newSortBy = event.target.value;
-    console.log("Sorting by:", newSortBy);
     updateState({
-      sortBy: newSortBy,
+      sortBy: event.target.value,
       page: 0,
     });
     fetchProducts({ page: 0 });
   };
 
-  // **Handle Opening Reviews Modal**
-  const handleOpenReviews = useCallback(async (product) => {
-    console.log('handleOpenReviews called with product:', product);
-    
-    // First set the selected product and open modal
-    setSelectedProduct(product);
-    setReviewModalOpen(true);
-    
-    // Then fetch reviews
-    await fetchReviews(product._id);
-    
-    // Log the current state after fetching
-    console.log('Current state after fetching reviews:', state);
-  }, [fetchReviews, state]);
+  const handleOpenReviews = useCallback(
+    async (product) => {
+      setSelectedProduct(product);
+      setReviewModalOpen(true);
+      await fetchReviews(product._id);
+    },
+    [fetchReviews]
+  );
 
-  // **Handle Closing Reviews Modal**
   const handleCloseReviews = () => {
-    console.log("Closing reviews modal");
     setReviewModalOpen(false);
-    setSelectedProduct(null); // Reset selected product
+    setSelectedProduct(null);
   };
 
-  // **Handle Adding a Product to the Cart**
   const handleAddToCart = async (product, quantity) => {
     try {
       if (!product?._id) {
         throw new Error("Invalid product ID");
       }
 
-      console.log(
-        `Adding product ID ${product._id} to cart with quantity ${quantity}`
-      );
       const response = await cartApi.addToCart(product._id, quantity);
-      console.log("Add to cart response:", response);
 
       if (response.success) {
         toast.success(`Added ${quantity} ${product.name} to cart`);
@@ -605,17 +613,14 @@ const ProductDisplay = () => {
     }
   };
 
-  // **Handle Editing a Review**
   const handleEditReview = (review) => {
-    console.log("Editing review:", review);
     setEditReview(review);
     setEditModalOpen(true);
   };
 
-  // **Handle Updating the Review in State after Editing**
   const handleUpdateReview = (updatedReview) => {
-    console.log("Updated review:", updatedReview);
     setState((prev) => ({
+      ...prev,
       reviews: {
         ...prev.reviews,
         [updatedReview.productId]: prev.reviews[updatedReview.productId].map(
@@ -625,18 +630,19 @@ const ProductDisplay = () => {
     }));
   };
 
-  // **Display Error if No Products are Fetched**
+  // Error State
   if (state.error && state.products.length === 0) {
     return (
       <Container>
         <Alert
           severity="error"
-          sx={{ mt: 3 }}
+          className="mt-6 rounded-none border-l-4 border-red-500"
           action={
             <Button
               color="inherit"
               size="small"
               onClick={() => fetchProducts()}
+              className="text-red-700 hover:text-red-800"
             >
               Retry
             </Button>
@@ -648,50 +654,67 @@ const ProductDisplay = () => {
     );
   }
 
-  // **Compute Filtered and Paginated Products**
-  const filteredProducts = state.products.filter(
-    (product) =>
-      product?.name?.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      product?.sku?.toLowerCase().includes(state.searchTerm.toLowerCase())
-  );
-
-  const paginatedProducts = filteredProducts.slice(
-    state.page * state.rowsPerPage,
-    state.page * state.rowsPerPage + state.rowsPerPage
-  );
-
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <Navbar />
-        <div className="pt-16">
-          <Container maxWidth="lg" sx={{ py: 4 }}>
-            {/* **Header Section** */}
-            <Box sx={{ mb: 4 }}>
-              <Grid container spacing={2} alignItems="center">
+        <div className="pt-20 pb-12">
+          <Container maxWidth="lg">
+            {/* Header */}
+            <Box className="mb-8">
+              <Grid container spacing={3} alignItems="center">
                 <Grid item xs={12} md={4}>
-                  <Typography variant="h4" component="h1">
+                  <Typography
+                    variant="h4"
+                    component="h1"
+                    className="font-sans font-medium tracking-tight text-slate-800"
+                  >
                     Products{" "}
-                    {!state.loading &&
-                      state.totalProducts > 0 &&
-                      `(${state.totalProducts})`}
+                    {!state.loading && state.totalProducts > 0 && (
+                      <span className="text-indigo-600">
+                        ({state.totalProducts})
+                      </span>
+                    )}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} md={8}>
-                  <Box display="flex" gap={2}>
-                    {/* **Search Field** */}
+                  <Box className="flex gap-4">
                     <TextField
                       fullWidth
                       placeholder="Search products..."
                       onChange={(e) => debouncedSearch(e.target.value)}
                       variant="outlined"
+                      className="bg-white"
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: "0",
+                          "&:hover fieldset": {
+                            borderColor: "#6366f1",
+                          },
+                          "&.Mui-focused fieldset": {
+                            borderColor: "#6366f1",
+                            borderWidth: "2px",
+                          },
+                        },
+                      }}
                       InputProps={{
-                        startAdornment: <StarIcon />, // Optional: Add an icon
+                        startAdornment: (
+                          <SearchIcon className="text-slate-400" />
+                        ),
                       }}
                     />
-                    {/* **Sort By Dropdown** */}
-                    <FormControl sx={{ minWidth: 120 }}>
-                      <InputLabel>Sort By</InputLabel>
+                    <FormControl
+                      sx={{
+                        minWidth: 120,
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: "0",
+                          backgroundColor: "white",
+                        },
+                      }}
+                    >
+                      <InputLabel className="text-slate-600">
+                        Sort By
+                      </InputLabel>
                       <Select
                         value={state.sortBy}
                         onChange={handleSort}
@@ -707,10 +730,10 @@ const ProductDisplay = () => {
               </Grid>
             </Box>
 
-            {/* **Product Grid** */}
+            {/* Product Grid */}
             <Suspense fallback={<ProductGridSkeleton />}>
               <ProductGrid
-                products={paginatedProducts}
+                products={state.products}
                 onAddToCart={handleAddToCart}
                 reviews={state.reviews}
                 loadingReviews={state.loadingReviews}
@@ -718,15 +741,15 @@ const ProductDisplay = () => {
               />
             </Suspense>
 
-            {/* **Loading Spinner** */}
+            {/* Loading State */}
             {state.loading && <LoadingSpinner />}
 
-            {/* **Empty State** */}
-            {!state.loading && filteredProducts.length === 0 && <EmptyState />}
+            {/* Empty State */}
+            {!state.loading && state.products.length === 0 && <EmptyState />}
 
-            {/* **Pagination** */}
-            {filteredProducts.length > 0 && (
-              <Box sx={{ py: 2, display: "flex", justifyContent: "flex-end" }}>
+            {/* Pagination */}
+            {state.products.length > 0 && (
+              <Box className="py-6 flex justify-end">
                 <TablePagination
                   component="div"
                   count={state.totalProducts}
@@ -735,43 +758,48 @@ const ProductDisplay = () => {
                   rowsPerPage={state.rowsPerPage}
                   onRowsPerPageChange={handleChangeRowsPerPage}
                   rowsPerPageOptions={[5, 10, 25, 50]}
-                  labelRowsPerPage="Products per page:"
-                  labelDisplayedRows={({ from, to, count }) =>
-                    `${from}-${to} of ${count}`
-                  }
+                  className="bg-white shadow-sm border-t-4 border-indigo-500"
+                  sx={{
+                    ".MuiTablePagination-select": {
+                      borderRadius: "0",
+                    },
+                    ".MuiTablePagination-selectIcon": {
+                      color: "#6366f1",
+                    },
+                  }}
                 />
               </Box>
+            )}
+
+            {/* Modals */}
+            <ReviewModal
+              open={reviewModalOpen}
+              onClose={handleCloseReviews}
+              product={selectedProduct}
+              reviews={
+                selectedProduct ? state.reviews[selectedProduct._id] || [] : []
+              }
+              loading={
+                selectedProduct
+                  ? !!state.loadingReviews[selectedProduct._id]
+                  : false
+              }
+              onEditReview={handleEditReview}
+            />
+
+            {editReview && (
+              <EditReviewDialog
+                open={editModalOpen}
+                onClose={() => setEditModalOpen(false)}
+                review={editReview}
+                onUpdate={handleUpdateReview}
+              />
             )}
           </Container>
         </div>
       </div>
-
-      {/* **Reviews Modal** */}
-      <ReviewModal
-    open={reviewModalOpen}
-    onClose={() => {
-      console.log('Closing review modal');
-      setReviewModalOpen(false);
-      setSelectedProduct(null);
-    }}
-    product={selectedProduct}
-    reviews={selectedProduct ? (state.reviews[selectedProduct._id] || []) : []}
-    loading={selectedProduct ? !!state.loadingReviews[selectedProduct._id] : false}
-    onEditReview={handleEditReview}
-  />
-
-      {/* **Edit Review Dialog** */}
-      {editReview && (
-        <EditReviewDialog
-          open={editModalOpen}
-          onClose={() => setEditModalOpen(false)}
-          review={editReview}
-          onUpdate={handleUpdateReview}
-        />
-      )}
     </ErrorBoundary>
   );
 };
 
-// **Export the component**
 export default memo(ProductDisplay);
