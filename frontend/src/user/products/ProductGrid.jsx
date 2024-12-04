@@ -1,4 +1,3 @@
-// src/components/products/ProductGrid.jsx
 import React, { useState } from 'react';
 import {
   Grid,
@@ -12,21 +11,23 @@ import {
   Box,
   Rating,
   Chip,
-  Collapse,
-  Divider
+  Stack
 } from '@mui/material';
 import {
   Add as AddIcon,
   Remove as RemoveIcon,
-  ShoppingCart as CartIcon
+  ShoppingCart as CartIcon,
 } from '@mui/icons-material';
+import { Eye } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { format } from 'date-fns';
+import ProductReviewModal from './ProductReviewModal';
 
 const ProductGrid = ({ products, onAddToCart }) => {
   const [quantities, setQuantities] = useState({});
   const [loading, setLoading] = useState({});
-  const [showReviews, setShowReviews] = useState({});
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
 
   const getQuantity = (productId) => quantities[productId] || 1;
 
@@ -48,108 +49,127 @@ const ProductGrid = ({ products, onAddToCart }) => {
     }
   };
 
-  const toggleReviews = (productId) => {
-    setShowReviews(prev => ({
-      ...prev,
-      [productId]: !prev[productId]
-    }));
+  const handleViewReviews = (product) => {
+    setSelectedProduct(product);
+    setReviewModalOpen(true);
   };
 
   return (
-    <Grid container spacing={3}>
-      {products.map((product) => (
-        <Grid item xs={12} sm={6} md={4} key={product._id}>
-          <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <CardMedia
-              component="img"
-              sx={{ height: 200, objectFit: 'cover' }}
-              image={product.images?.[0]?.url || '/placeholder.jpg'}
-              alt={product.name}
-            />
-            
-            <CardContent sx={{ flexGrow: 1 }}>
-              <Typography gutterBottom variant="h6" component="h2">
-                {product.name}
-              </Typography>
-
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                <Rating value={product.rating || 0} readOnly precision={0.5} size="small" />
-                <Typography variant="body2" color="text.secondary">
-                  ({product.numReviews || 0} reviews)
-                </Typography>
-              </Box>
-
-              <Typography variant="h6" color="primary" gutterBottom>
-                ₱{product.price?.toFixed(2)}
-              </Typography>
-
-              {!product.inStock && (
-                <Chip label="Out of Stock" color="error" size="small" />
-              )}
-
-              {product.reviews?.length > 0 && (
-                <>
-                  <Button size="small" onClick={() => toggleReviews(product._id)} sx={{ mt: 2 }}>
-                    {showReviews[product._id] ? 'Hide Reviews' : 'Show Reviews'}
+    <>
+      <Grid container spacing={3}>
+        {products.map((product) => (
+          <Grid item xs={12} sm={6} md={4} key={product._id}>
+            <Card className="h-full flex flex-col hover:shadow-lg transition-duration-200">
+              {/* Product Image with Hover Overlay */}
+              <Box className="relative pt-[75%]">
+                <CardMedia
+                  component="img"
+                  image={product.images?.[0]?.url || '/placeholder.jpg'}
+                  alt={product.name}
+                  className="absolute top-0 left-0 w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = '/placeholder.jpg';
+                  }}
+                />
+                <Box className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                  <Button
+                    variant="contained"
+                    onClick={() => handleViewReviews(product)}
+                    startIcon={<Eye size={18} />}
+                    className="bg-white text-gray-800 hover:bg-gray-100"
+                  >
+                    View Reviews
                   </Button>
-
-                  <Collapse in={showReviews[product._id]}>
-                    <Box sx={{ mt: 2 }}>
-                      <Typography variant="subtitle2" gutterBottom>
-                        Recent Reviews
-                      </Typography>
-                      <Box sx={{ maxHeight: 200, overflowY: 'auto' }}>
-                        {product.reviews.map((review) => (
-                          <Box key={review._id} sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Rating value={review.rating} readOnly size="small" />
-                              <Typography variant="caption" color="text.secondary">
-                                {format(new Date(review.createdAt), 'MMM dd, yyyy')}
-                              </Typography>
-                            </Box>
-                            <Typography variant="body2" sx={{ mt: 1 }}>
-                              {review.comment}
-                            </Typography>
-                          </Box>
-                        ))}
-                      </Box>
-                    </Box>
-                  </Collapse>
-                </>
-              )}
-            </CardContent>
-
-            <CardActions sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <IconButton
-                  size="small"
-                  onClick={() => handleQuantityChange(product._id, -1)}
-                  disabled={getQuantity(product._id) <= 1}
-                >
-                  <RemoveIcon />
-                </IconButton>
-                <Typography>{getQuantity(product._id)}</Typography>
-                <IconButton
-                  size="small"
-                  onClick={() => handleQuantityChange(product._id, 1)}
-                >
-                  <AddIcon />
-                </IconButton>
+                </Box>
               </Box>
-              <Button
-                variant="contained"
-                startIcon={<CartIcon />}
-                onClick={() => handleAddToCart(product)}
-                disabled={loading[product._id] || !product.inStock}
-                sx={{ ml: 'auto' }}
-              >
-                Add to Cart
-              </Button>
-            </CardActions>
-          </Card>
-        </Grid>
-      ))}
-    </Grid>
+
+              <CardContent className="flex-grow flex flex-col">
+                {/* Product Title */}
+                <Typography variant="h6" component="h2" className="font-medium mb-2 line-clamp-2">
+                  {product.name}
+                </Typography>
+
+                {/* Rating and Review Count */}
+                <Box className="flex items-center gap-2 mb-2">
+                  <Rating value={product.rating || 0} readOnly precision={0.5} size="small" />
+                  <Typography variant="body2" color="text.secondary">
+                    ({product.numReviews || 0})
+                  </Typography>
+                </Box>
+
+                {/* Price and Stock Status */}
+                <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
+                  <Typography variant="h6" color="primary" className="font-semibold">
+                    ₱{product.price?.toLocaleString()}
+                  </Typography>
+                  {!product.inStock ? (
+                    <Chip label="Out of Stock" color="error" size="small" />
+                  ) : product.stockQuantity <= (product.lowStockThreshold || 5) ? (
+                    <Chip label="Low Stock" color="warning" size="small" />
+                  ) : (
+                    <Chip label="In Stock" color="success" size="small" />
+                  )}
+                </Stack>
+
+                {/* Short Description */}
+                {product.shortDescription && (
+                  <Typography variant="body2" color="text.secondary" className="mb-4 line-clamp-2">
+                    {product.shortDescription}
+                  </Typography>
+                )}
+              </CardContent>
+
+              <CardActions className="p-4 border-t">
+                {/* Quantity Controls */}
+                <Box className="flex items-center gap-1">
+                  <IconButton
+                    size="small"
+                    onClick={() => handleQuantityChange(product._id, -1)}
+                    disabled={getQuantity(product._id) <= 1}
+                  >
+                    <RemoveIcon fontSize="small" />
+                  </IconButton>
+                  <Typography variant="body2" className="w-8 text-center">
+                    {getQuantity(product._id)}
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleQuantityChange(product._id, 1)}
+                    disabled={getQuantity(product._id) >= (product.stockQuantity || 99)}
+                  >
+                    <AddIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+
+                {/* Add to Cart Button */}
+                <Button
+                  variant="contained"
+                  startIcon={<CartIcon />}
+                  onClick={() => handleAddToCart(product)}
+                  disabled={loading[product._id] || !product.inStock}
+                  className="ml-auto"
+                  size="small"
+                >
+                  {loading[product._id] ? 'Adding...' : 'Add to Cart'}
+                </Button>
+              </CardActions>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+
+      {/* Review Modal */}
+      <ProductReviewModal
+        open={reviewModalOpen}
+        onClose={() => {
+          setReviewModalOpen(false);
+          setSelectedProduct(null);
+        }}
+        product={selectedProduct}
+        reviews={selectedProduct?.reviews || []}
+      />
+    </>
   );
 };
 
@@ -162,16 +182,23 @@ ProductGrid.propTypes = {
       url: PropTypes.string.isRequired
     })),
     inStock: PropTypes.bool,
+    stockQuantity: PropTypes.number,
+    lowStockThreshold: PropTypes.number,
     rating: PropTypes.number,
     numReviews: PropTypes.number,
+    shortDescription: PropTypes.string,
     reviews: PropTypes.arrayOf(PropTypes.shape({
       _id: PropTypes.string.isRequired,
       rating: PropTypes.number.isRequired,
       comment: PropTypes.string.isRequired,
       createdAt: PropTypes.string.isRequired,
+      order: PropTypes.shape({
+        orderNumber: PropTypes.string.isRequired
+      }),
       user: PropTypes.shape({
         displayName: PropTypes.string,
-        photoURL: PropTypes.string
+        photoURL: PropTypes.string,
+        email: PropTypes.string
       })
     }))
   })).isRequired,

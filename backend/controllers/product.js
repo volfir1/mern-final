@@ -1,6 +1,7 @@
 // controllers/product.controller.js
 import Product from "../models/product.js";
 import mongoose from "mongoose";
+import Review from "./reviews.js";  
 import { 
   uploadImage, 
   deleteImage, 
@@ -284,7 +285,33 @@ export const getProducts = async (req, res) => {
     } = req.query;
 
     const query = {};
-    
+
+    // Search filter
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Category filter
+    if (category) {
+      query.category = category;
+    }
+
+    // Subcategories filter
+    if (subcategories) {
+      query.subcategories = { 
+        $in: subcategories.split(',')
+      };
+    }
+
+    // Price range filter
+    query.price = {
+      $gte: Number(minPrice),
+      $lte: Number(maxPrice)
+    };
+
     // Stock filters
     if (inStock !== undefined) {
       query.inStock = inStock === 'true';
@@ -300,6 +327,13 @@ export const getProducts = async (req, res) => {
       }
     }
 
+    // Tags filter
+    if (tags) {
+      query.tags = { 
+        $in: tags.split(',')
+      };
+    }
+
     // Low stock filter
     if (lowStock === 'true') {
       query.$expr = {
@@ -310,53 +344,32 @@ export const getProducts = async (req, res) => {
       };
     }
 
-    // Other filters...
-    if (search) {
-      query.name = { $regex: search, $options: "i" };
-    }
-    if (category) query.category = category;
-    if (subcategories) {
-      const subcategoryArray = subcategories.split(',');
-      query.subcategories = { $in: subcategoryArray };
-    }
-    if (tags) {
-      const tagArray = tags.split(',');
-      query.tags = { $in: tagArray };
-    }
-
-    // Price range
-    query.price = { 
-      $gte: Number(minPrice), 
-      $lte: Number(maxPrice)
-    };
-
-    const totalCount = await Product.countDocuments(query);
-
     const products = await Product.find(query)
-      .populate("category", "name")
-      .populate("subcategories", "name")
-      .sort({ [sort]: order === "desc" ? -1 : 1 })
+      .populate('category')
+      .populate('subcategories')
+      .sort({ [sort]: order === 'desc' ? -1 : 1 })
       .skip((page - 1) * limit)
       .limit(Number(limit));
+
+    const total = await Product.countDocuments(query);
 
     res.status(200).json({
       success: true,
       data: products,
-      pagination: {
-        currentPage: Number(page),
-        totalPages: Math.ceil(totalCount / limit),
-        totalProducts: totalCount,
-        hasMore: page * limit < totalCount
-      }
+      total,
+      pages: Math.ceil(total / limit)
     });
+
   } catch (error) {
+    console.error('Get products error:', error);
     res.status(400).json({
       success: false,
-      message: 'Failed to fetch products',
-      error: error.message
+      message: error.message
     });
   }
 };
+
+
 
 // export const updateProductStock = async (req, res) => {
 //   try {

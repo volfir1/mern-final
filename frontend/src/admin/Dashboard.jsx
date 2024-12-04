@@ -1,3 +1,4 @@
+// src/admin/dashboard/SalesDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { LineChart, BarChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Line, Bar, ResponsiveContainer } from 'recharts';
 import { DollarSign, TrendingUp, ShoppingBag, Calendar, Users } from 'lucide-react';
@@ -8,20 +9,20 @@ import Sidebar from '@/components/sidebar/Sidebar';
 import api from '@/utils/api';
 
 const StatCard = ({ icon: Icon, title, value, trend, isCurrency = false }) => (
-  <div className="bg-white p-6 rounded-lg shadow-sm">
+  <div className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out">
     <div className="flex items-center justify-between">
       <div>
-        <p className="text-gray-500 text-sm">{title}</p>
-        <h3 className="text-2xl font-semibold mt-1">
+        <p className="text-gray-600 text-sm font-medium">{title}</p>
+        <h3 className="text-3xl font-semibold mt-1 text-gray-800">
           {isCurrency ? `₱${value.toLocaleString()}` : value.toLocaleString()}
         </h3>
       </div>
-      <div className="bg-blue-50 p-3 rounded-full">
-        <Icon className="w-6 h-6 text-blue-500" />
+      <div className="bg-blue-100 p-3 rounded-full shadow-md">
+        <Icon className="w-6 h-6 text-blue-600" />
       </div>
     </div>
     {trend !== undefined && (
-      <p className="text-sm mt-4">
+      <p className="text-sm mt-4 flex items-center">
         <span className={`font-medium ${trend >= 0 ? 'text-green-500' : 'text-red-500'}`}>
           {trend >= 0 ? '+' : ''}{trend}%
         </span>
@@ -141,10 +142,10 @@ const SalesDashboard = () => {
       <Sidebar />
       
       <div className="flex-1 ml-20 p-6 overflow-auto">
-        <h1 className="text-2xl font-bold mb-6">Sales Analytics</h1>
+        <h1 className="text-3xl font-bold mb-8 text-gray-800">Sales Analytics</h1>
         
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <StatCard 
             icon={DollarSign} 
             title="Total Sales" 
@@ -166,12 +167,12 @@ const SalesDashboard = () => {
             trend={8.1}
             isCurrency={false}
           />
-          <StatCard 
+          {/* <StatCard 
             icon={Users} 
             title="Total Users" 
             value={stats.userCount}
             isCurrency={false}
-          />
+          /> */}
           <StatCard 
             icon={Calendar} 
             title="Date Range" 
@@ -181,10 +182,10 @@ const SalesDashboard = () => {
         </div>
 
         {/* Charts */}
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* Monthly Overview */}
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <h2 className="text-lg font-semibold mb-4">Monthly Sales Overview</h2>
+          <div className="bg-white p-8 rounded-lg shadow-xl">
+            <h2 className="text-2xl font-semibold text-gray-800 mb-6">Monthly Sales Overview</h2>
             <div className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={monthlyData}>
@@ -200,17 +201,17 @@ const SalesDashboard = () => {
           </div>
 
           {/* Filtered Sales Chart */}
-          <div className="bg-white p-6 rounded-lg shadow-sm">
+          <div className="bg-white p-8 rounded-lg shadow-xl">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold">Detailed Sales Analysis</h2>
-              <div className="flex gap-4">
+              <h2 className="text-2xl font-semibold text-gray-800">Detailed Sales Analysis</h2>
+              <div className="flex gap-6">
                 <DatePicker
                   selected={startDate}
                   onChange={setStartDate}
                   selectsStart
                   startDate={startDate}
                   endDate={endDate}
-                  className="px-3 py-2 border rounded"
+                  className="px-4 py-3 border rounded-lg shadow-md bg-white text-gray-700 focus:ring-2 focus:ring-blue-500"
                   dateFormat="yyyy/MM/dd"
                 />
                 <DatePicker
@@ -220,7 +221,7 @@ const SalesDashboard = () => {
                   startDate={startDate}
                   endDate={endDate}
                   minDate={startDate}
-                  className="px-3 py-2 border rounded"
+                  className="px-4 py-3 border rounded-lg shadow-md bg-white text-gray-700 focus:ring-2 focus:ring-blue-500"
                   dateFormat="yyyy/MM/dd"
                 />
               </div>
@@ -233,7 +234,8 @@ const SalesDashboard = () => {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="sales" stroke="#4CAF50" name="Sales (₱)" />
+                  <Line type="monotone" dataKey="sales" stroke="#34D399" name="Sales (₱)" />
+                  <Line type="monotone" dataKey="orders" stroke="#F97316" name="Orders" />
                 </LineChart>
               </ResponsiveContainer>
             </div>

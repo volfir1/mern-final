@@ -3,6 +3,7 @@ import Order from '../models/order.js';
 import Cart from '../models/cart.js';
 import UserProfile from '../models/userProfile.js';
 import Stripe from 'stripe';
+import Review from '../models/reviews.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -104,14 +105,31 @@ export const getUserOrders = async (req, res) => {
             query.orderStatus = status.toUpperCase();
         }
 
+        // Fetch orders with populated data
         const orders = await Order.find(query)
             .populate('user', 'email')
             .populate({
                 path: 'items.product',
                 select: 'name price images'
             })
-            .populate('shippingAddress')
-            .sort({ createdAt: -1 });
+            .populate({
+                path: 'items.userReview',
+                model: 'Review',
+                select: 'rating comment createdAt'
+            })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        // Debug logging
+        if (orders.length > 0) {
+            console.log('First order review data:', 
+                JSON.stringify(orders[0].items.map(item => ({
+                    productId: item.product?._id,
+                    hasReview: !!item.userReview,
+                    reviewData: item.userReview
+                })), null, 2)
+            );
+        }
 
         res.status(200).json({
             success: true,

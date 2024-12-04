@@ -1,4 +1,3 @@
-// src/user/reviews/ReviewsTab.jsx
 import React, { useState } from 'react';
 import {
   Box,
@@ -6,15 +5,18 @@ import {
   Tab,
   Grid,
   Typography,
-  Divider,
   CircularProgress,
-  Alert
+  Alert,
+  Button
 } from '@mui/material';
 import { format } from 'date-fns';
 import PropTypes from 'prop-types';
 import ProductCard from './ProductCard';
 import ReviewModal from './ReviewModal';
+import { useNavigate } from 'react-router-dom';
+import { ArrowBack } from '@mui/icons-material';
 
+// OrderGroup Component Definition
 const OrderGroup = ({ order, products, onReview, isReviewed }) => (
   <Box className="mb-8 bg-white rounded-lg shadow-sm p-4">
     <Box className="flex items-center justify-between mb-4">
@@ -36,48 +38,72 @@ const OrderGroup = ({ order, products, onReview, isReviewed }) => (
         <Grid item xs={12} sm={6} md={4} key={`${order._id}_${product.productId}`}>
           <ProductCard
             product={product}
-            onReview={() => onReview({ ...product, orderId: order._id })}
+            onReview={() => onReview(product)}
             isReviewed={isReviewed}
           />
         </Grid>
       ))}
     </Grid>
-    <Divider className="mt-6" />
   </Box>
 );
 
+// OrderGroup PropTypes
+OrderGroup.propTypes = {
+  order: PropTypes.shape({
+    _id: PropTypes.string.isRequired,
+    orderNumber: PropTypes.string.isRequired,
+    updatedAt: PropTypes.string.isRequired
+  }).isRequired,
+  products: PropTypes.arrayOf(PropTypes.shape({
+    productId: PropTypes.string.isRequired,
+    orderId: PropTypes.string.isRequired,
+    name: PropTypes.string.isRequired,
+    images: PropTypes.arrayOf(PropTypes.string),
+    userReview: PropTypes.object,
+    price: PropTypes.number.isRequired,
+    quantity: PropTypes.number.isRequired
+  })).isRequired,
+  onReview: PropTypes.func.isRequired,
+  isReviewed: PropTypes.bool.isRequired
+};
+
+// ReviewsTab Component
 const ReviewsTab = ({ orders = [], onSubmitReview, submitting = false, loading = false, error = null }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   const deliveredOrders = orders
-  .filter(order => order.orderStatus === 'DELIVERED')
-  .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
-  .map(order => ({
-    ...order,
-    products: order.items.map(item => ({
-      _id: item.product?._id,
-      productId: item.product?._id,
-      orderId: order._id,
-      name: item.name || item.product?.name,
-      images: item.product?.images || [],
-      userReview: item.userReview ? {
-        _id: typeof item.userReview === 'string' ? item.userReview : item.userReview._id,
-        rating: typeof item.userReview === 'string' ? 0 : item.userReview.rating,
-        comment: typeof item.userReview === 'string' ? '' : item.userReview.comment
-      } : null,
-      price: item.price,
-      quantity: item.quantity
-    }))
-  }));
+    .filter(order => order.orderStatus === 'DELIVERED')
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    .map(order => ({
+        ...order,
+        products: order.items.map(item => {
+            const imageUrl = item.product?.images?.[0]?.url || 
+                           item.product?.images?.[0] || 
+                           '/placeholder.jpg';
 
+            const hasValidReview = !!item.userReview;
 
+            return {
+                _id: item.product?._id,
+                productId: item.product?._id,
+                orderId: order._id,
+                name: item.name || item.product?.name,
+                images: [imageUrl],
+                userReview: hasValidReview ? item.userReview : null,
+                price: item.price,
+                quantity: item.quantity,
+                hasReview: hasValidReview
+            };
+        })
+    }));
 
   const handleReviewClick = (product) => {
     setSelectedProduct({
       ...product,
-      _id: product.productId // Ensure _id is set for backwards compatibility
+      _id: product.productId
     });
     setModalOpen(true);
   };
@@ -89,16 +115,71 @@ const ReviewsTab = ({ orders = [], onSubmitReview, submitting = false, loading =
 
   const handleSubmitReview = async (reviewData) => {
     try {
+      console.log('Submitting review:', {
+        ...reviewData,
+        productId: selectedProduct.productId,
+        orderId: selectedProduct.orderId
+      });
+  
       await onSubmitReview({
         ...reviewData,
         productId: selectedProduct.productId,
         orderId: selectedProduct.orderId
       });
+  
+      console.log('Review submitted successfully');
       handleCloseModal();
+      
+      // Instead of window.location.reload(), let's refetch the orders
+      await fetchOrders();
     } catch (error) {
-      console.error('Review submission failed:', error);
+      console.error('Review submission failed:', {
+        error: error.message,
+        data: {
+          productId: selectedProduct.productId,
+          orderId: selectedProduct.orderId
+        }
+      });
+      throw error;
     }
   };
+  console.log('Sample order item with review:', orders[0]?.items[0]);
+
+
+  const filterProducts = (products, isReviewed) => {
+    console.log('Filtering products:', {
+        totalProducts: products.length,
+        isReviewed,
+        productsDetails: products.map(p => ({
+            id: p.productId,
+            name: p.name,
+            hasReview: !!p.userReview,
+            reviewData: p.userReview ? {
+                rating: p.userReview.rating,
+                comment: p.userReview.comment
+            } : null
+        }))
+    });
+
+    const filteredProducts = products.filter(product => {
+        const hasReview = !!product.userReview;
+        return isReviewed === hasReview;
+    });
+
+    console.log('Filtered results:', {
+        isReviewed,
+        filteredCount: filteredProducts.length,
+        filteredProducts: filteredProducts.map(p => p.name)
+    });
+
+    return filteredProducts;
+};
+
+  const toReviewCount = deliveredOrders.reduce((count, order) => 
+    count + filterProducts(order.products, false).length, 0);
+  
+  const reviewedCount = deliveredOrders.reduce((count, order) => 
+    count + filterProducts(order.products, true).length, 0);
 
   if (loading) {
     return (
@@ -129,13 +210,18 @@ const ReviewsTab = ({ orders = [], onSubmitReview, submitting = false, loading =
     );
   }
 
-  const toReviewCount = deliveredOrders.reduce((count, order) => 
-    count + order.products.filter(p => !p.userReview).length, 0);
-  const reviewedCount = deliveredOrders.reduce((count, order) => 
-    count + order.products.filter(p => p.userReview).length, 0);
-
   return (
     <Box>
+      <Button
+        variant="outlined"
+        color="primary"
+        onClick={() => navigate('/user/products')}
+        className="mb-6"
+        startIcon={<ArrowBack />}
+      >
+        Back to Products
+      </Button>
+
       <Tabs
         value={activeTab}
         onChange={(_, newValue) => setActiveTab(newValue)}
@@ -146,9 +232,7 @@ const ReviewsTab = ({ orders = [], onSubmitReview, submitting = false, loading =
       </Tabs>
 
       {deliveredOrders.map(order => {
-      const orderProducts = activeTab === 0 
-      ? order.products.filter(p => !p.userReview?._id)
-      : order.products.filter(p => p.userReview?._id);
+        const orderProducts = filterProducts(order.products, activeTab === 1);
 
         if (!orderProducts.length) return null;
 
@@ -174,49 +258,32 @@ const ReviewsTab = ({ orders = [], onSubmitReview, submitting = false, loading =
   );
 };
 
-OrderGroup.propTypes = {
-  order: PropTypes.shape({
+// ReviewsTab PropTypes
+ReviewsTab.propTypes = {
+  orders: PropTypes.arrayOf(PropTypes.shape({
     _id: PropTypes.string.isRequired,
     orderNumber: PropTypes.string.isRequired,
-    updatedAt: PropTypes.string.isRequired
-  }).isRequired,
-  products: PropTypes.arrayOf(PropTypes.shape({
-    productId: PropTypes.string.isRequired,
-    orderId: PropTypes.string.isRequired,
-    name: PropTypes.string.isRequired,
-    images: PropTypes.array,
-    userReview: PropTypes.object,
-    price: PropTypes.number.isRequired,
-    quantity: PropTypes.number.isRequired
-  })).isRequired,
-  onReview: PropTypes.func.isRequired,
-  isReviewed: PropTypes.bool.isRequired
+    orderStatus: PropTypes.string.isRequired,
+    updatedAt: PropTypes.string.isRequired,
+    items: PropTypes.arrayOf(PropTypes.shape({
+      product: PropTypes.object,
+      name: PropTypes.string,
+      price: PropTypes.number,
+      quantity: PropTypes.number,
+      userReview: PropTypes.oneOfType([ 
+        PropTypes.string,
+        PropTypes.shape({
+          _id: PropTypes.string.isRequired,
+          rating: PropTypes.number,
+          comment: PropTypes.string
+        })
+      ])
+    })).isRequired
+  })),
+  onSubmitReview: PropTypes.func.isRequired,
+  submitting: PropTypes.bool,
+  loading: PropTypes.bool,
+  error: PropTypes.string
 };
 
-ReviewsTab.propTypes = {
-    orders: PropTypes.arrayOf(PropTypes.shape({
-      _id: PropTypes.string.isRequired,
-      orderNumber: PropTypes.string.isRequired,
-      orderStatus: PropTypes.string.isRequired,
-      updatedAt: PropTypes.string.isRequired,
-      items: PropTypes.arrayOf(PropTypes.shape({
-        product: PropTypes.object,
-        name: PropTypes.string,
-        price: PropTypes.number,
-        quantity: PropTypes.number,
-        userReview: PropTypes.oneOfType([
-          PropTypes.string, // Allow string (review ID)
-          PropTypes.shape({ // Or full review object
-            _id: PropTypes.string.isRequired,
-            rating: PropTypes.number,
-            comment: PropTypes.string
-          })
-        ])
-      })).isRequired
-    })),
-    onSubmitReview: PropTypes.func.isRequired,
-    submitting: PropTypes.bool,
-    loading: PropTypes.bool,
-    error: PropTypes.string
-  };
 export default ReviewsTab;

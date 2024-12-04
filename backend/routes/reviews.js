@@ -1,21 +1,31 @@
-import express from 'express';
-import reviewController from '../controllers/reviews.js';
-import { protect, authorize } from '../middleware/auth.js';
+import express from 'express'; 
+import reviewController from '../controllers/reviews.js'; 
+import { protect, authorize } from '../middleware/auth.js';  
 
-const router = express.Router();
+const router = express.Router();  
 
-// Public routes
-router.get('/product/:productId', reviewController.getProductReviews);
+// Public routes 
+router.get('/product/:productId', reviewController.getProductReviews);  
 
-// Protected routes (require authentication)
-router.use(protect); // Apply authentication to all routes below
+// Protected routes 
+router.use((req, res, next) => {
+  console.log('Headers:', req.headers);
+  console.log('Authorization:', req.headers.authorization);
+  next();
+});
 
-// Regular user routes
-router.post('/', reviewController.createReview);
-router.put('/:reviewId', reviewController.updateReview);
-router.get('/user/me', reviewController.getUserReviews);
+router.use(protect);  
 
-// Admin only routes
-router.delete('/:reviewId', authorize('admin'), reviewController.deleteReview);
+router.route('/')   
+  .post((req, res, next) => {
+    console.log('Create Review Request User:', req.user);
+    console.log('Create Review Request Body:', req.body);
+    next();
+  }, reviewController.createReview)   
+  .get(reviewController.getUserReviews);  
+
+router.route('/:reviewId')   
+  .put(reviewController.updateReview)   
+  .delete(authorize('admin'), reviewController.deleteReview);  
 
 export default router;

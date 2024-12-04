@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 const reviewSchema = new mongoose.Schema({
+  version: { type: Number, default: 1 },
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'UserAuth',
@@ -44,7 +45,9 @@ const reviewSchema = new mongoose.Schema({
 });
 
 // Compound index to ensure one review per user per product
-reviewSchema.index({ user: 1, product: 1, order: 1 }, { unique: true });// Update product's average rating when review is added/modified
+reviewSchema.index({ user: 1, product: 1, order: 1 }, { unique: true });
+
+// Update product's average rating when review is added/modified
 reviewSchema.post('save', async function() {
   const productId = this.product;
   const Product = mongoose.model('Product');

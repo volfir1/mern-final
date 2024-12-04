@@ -1,5 +1,4 @@
-// src/user/reviews/ReviewModal.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { Formik, Form } from 'formik';
 import * as Yup from 'yup';
 import {
@@ -28,29 +27,41 @@ const reviewValidationSchema = Yup.object().shape({
 });
 
 const ReviewModal = ({ open, onClose, product, onSubmit, submitting }) => {
+  // Add error state
+  const [error, setError] = useState(null);
+
   const initialValues = {
-    rating: 0,
-    comment: '',
+    rating: product?.userReview?.rating || 0,
+    comment: product?.userReview?.comment || '',
     productId: product?.productId || '',
-    orderId: product?.orderId || ''
+    orderId: product?.orderId || '',
+    reviewId: product?.userReview?._id
+  };
+
+  const isEditMode = !!product?.userReview?._id;
+
+  const handleSubmit = async (values, { setSubmitting }) => {
+    try {
+      setError(null); // Reset error state before submitting
+      await onSubmit(values); // Submit review
+      onClose(); // Close the modal after successful submission
+    } catch (err) {
+      setError(err.message); // Set error message if submission fails
+    } finally {
+      setSubmitting(false); // Stop submitting state
+    }
   };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>{isEditMode ? 'Edit Review' : 'Write Review'}</DialogTitle>
+      {submitting && <LinearProgress />}
+
       <Formik
+        enableReinitialize
         initialValues={initialValues}
         validationSchema={reviewValidationSchema}
-        onSubmit={async (values, { setSubmitting, resetForm }) => {
-          try {
-            await onSubmit(values);
-            resetForm();
-            onClose();
-          } catch (error) {
-            console.error('Review submission failed:', error);
-          } finally {
-            setSubmitting(false);
-          }
-        }}
+        onSubmit={handleSubmit}
       >
         {({
           values,
@@ -62,13 +73,28 @@ const ReviewModal = ({ open, onClose, product, onSubmit, submitting }) => {
           isSubmitting
         }) => (
           <Form>
-            <DialogTitle>Review {product?.name}</DialogTitle>
-            {submitting && <LinearProgress />}
-            
             <DialogContent>
               <Box className="space-y-6">
+                {/* Display Error */}
+                {error && (
+                  <Alert severity="error" className="mx-4 mt-4">
+                    {error}
+                  </Alert>
+                )}
+
+                {/* Product Info */}
+                <Box className="flex items-center gap-4">
+                  <img
+                    src={product?.images?.[0] || '/placeholder.jpg'}
+                    alt={product?.name}
+                    className="w-20 h-20 object-cover rounded"
+                  />
+                  <Typography variant="h6">{product?.name}</Typography>
+                </Box>
+
+                {/* Rating */}
                 <Box className="space-y-2">
-                  <Typography component="legend">Your Rating</Typography>
+                  <Typography component="legend">Rating</Typography>
                   <Rating
                     name="rating"
                     value={values.rating}
@@ -83,12 +109,13 @@ const ReviewModal = ({ open, onClose, product, onSubmit, submitting }) => {
                   )}
                 </Box>
 
+                {/* Comment */}
                 <TextField
                   fullWidth
                   multiline
                   rows={4}
                   name="comment"
-                  label="Your Review (Optional)"
+                  label="Your Review"
                   value={values.comment}
                   onChange={handleChange}
                   onBlur={handleBlur}
@@ -105,17 +132,18 @@ const ReviewModal = ({ open, onClose, product, onSubmit, submitting }) => {
 
             <DialogActions className="p-4">
               <Button 
-                onClick={onClose} 
+                onClick={onClose}
                 disabled={isSubmitting || submitting}
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 type="submit"
                 variant="contained"
+                color="primary"
                 disabled={isSubmitting || submitting || !values.rating}
               >
-                {submitting ? 'Submitting...' : 'Submit Review'}
+                {submitting ? 'Submitting...' : isEditMode ? 'Update Review' : 'Submit Review'}
               </Button>
             </DialogActions>
           </Form>
@@ -132,7 +160,12 @@ ReviewModal.propTypes = {
     productId: PropTypes.string.isRequired,
     name: PropTypes.string.isRequired,
     images: PropTypes.arrayOf(PropTypes.string),
-    orderId: PropTypes.string.isRequired
+    orderId: PropTypes.string.isRequired,
+    userReview: PropTypes.shape({
+      _id: PropTypes.string,
+      rating: PropTypes.number,
+      comment: PropTypes.string
+    })
   }),
   onSubmit: PropTypes.func.isRequired,
   submitting: PropTypes.bool
