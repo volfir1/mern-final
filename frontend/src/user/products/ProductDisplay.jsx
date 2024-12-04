@@ -64,7 +64,7 @@ const ReviewStars = memo(({ rating }) => (
 ));
 
 // ReviewCard Component
-const ReviewCard = memo(({ review, onEdit }) => (
+const ReviewCard = memo(({ review, onEdit, canEdit }) => (
   <Box className="mb-6 p-4 bg-white rounded-none border-l-4 border-indigo-500 shadow-sm">
     <Box className="flex justify-between items-start mb-3">
       <Box className="flex items-center gap-3">
@@ -76,97 +76,119 @@ const ReviewCard = memo(({ review, onEdit }) => (
           {(review.user?.displayName || review.user?.email)?.charAt(0) || "?"}
         </Avatar>
         <Box>
-          <Typography
-            variant="subtitle2"
-            className="font-sans font-medium tracking-wide"
-          >
+          <Typography variant="subtitle2" className="font-medium">
             {review.user?.displayName || review.user?.email || "Anonymous"}
           </Typography>
-          <Typography variant="caption" className="text-slate-600">
-            Order #{review.order?.orderNumber} •{" "}
-            {format(new Date(review.createdAt), "MMM dd, yyyy")}
+          <Typography variant="caption" color="text.secondary">
+            Order #{review.order?.orderNumber} • {format(new Date(review.createdAt), "MMM dd, yyyy")}
           </Typography>
         </Box>
       </Box>
-      {review.user?._id === review.order?.userId && (
-        <Button
+      {canEdit && (
+        <IconButton
           size="small"
-          startIcon={<EditIcon />}
-          className="text-indigo-600 hover:text-indigo-800"
           onClick={() => onEdit(review)}
+          className="text-indigo-600 hover:text-indigo-800"
         >
-          Edit
-        </Button>
+          <EditIcon fontSize="small" />
+        </IconButton>
       )}
     </Box>
     <ReviewStars rating={review.rating} />
-    <Typography variant="body2" className="mt-3 text-slate-700 leading-relaxed">
+    <Typography variant="body2" className="mt-3">
       {review.comment}
     </Typography>
   </Box>
 ));
 
 // ReviewModal Component
-const ReviewModal = memo(
-  ({ open, onClose, product, reviews = [], loading = false, onEditReview }) => {
-    return (
-      <Dialog
-        open={open}
-        onClose={onClose}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          className: "rounded-none border-t-4 border-indigo-500",
-        }}
-      >
-        <DialogTitle className="bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-          <Typography
-            variant="h6"
-            className="font-sans font-medium tracking-wide"
-          >
-            Reviews for {product?.name}
-          </Typography>
-          <IconButton
-            onClick={onClose}
-            className="text-slate-500 hover:text-slate-700"
-            edge="end"
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent className="py-6">
-          {loading ? (
-            <Box className="flex justify-center p-8">
-              <CircularProgress className="text-indigo-500" />
-            </Box>
-          ) : reviews?.length > 0 ? (
-            <Box className="space-y-4">
-              {reviews.map((review) => (
+const ReviewModal = memo(({ open, onClose, product, reviews = [], loading = false, onEditReview }) => {
+  const { user } = useAuth();
+  const [editingReview, setEditingReview] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const reviewApi = useReviewApi();
+
+  const handleEditSubmit = async (reviewData) => {
+    try {
+      setSubmitting(true);
+      const response = await reviewApi.updateReview(editingReview._id, reviewData);
+      
+      if (response.success) {
+        const updatedReviews = reviews.map(review => 
+          review._id === editingReview._id ? response.data : review
+        );
+        onEditReview(updatedReviews);
+        setEditingReview(null);
+        toast.success('Review updated successfully');
+      }
+    } catch (error) {
+      toast.error(error.message || 'Failed to update review');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Rest of your ReviewModal code...
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        <Typography variant="h6">Reviews for {product?.name}</Typography>
+      </DialogTitle>
+      <DialogContent>
+        {loading ? (
+          <CircularProgress />
+        ) : reviews?.length > 0 ? (
+          <Box className="space-y-4">
+            {reviews.map((review) => (
+              editingReview?._id === review._id ? (
+                <Box key={review._id} className="p-4 border rounded">
+                  <Rating
+                    value={editingReview.rating}
+                    onChange={(_, value) => setEditingReview(prev => ({ ...prev, rating: value }))}
+                    disabled={submitting}
+                  />
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={4}
+                    value={editingReview.comment}
+                    onChange={(e) => setEditingReview(prev => ({ ...prev, comment: e.target.value }))}
+                    disabled={submitting}
+                    className="mt-3"
+                  />
+                  <Box className="mt-3 flex justify-end gap-2">
+                    <Button onClick={() => setEditingReview(null)} disabled={submitting}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="contained"
+                      onClick={() => handleEditSubmit(editingReview)}
+                      disabled={submitting}
+                    >
+                      {submitting ? <CircularProgress size={20} /> : 'Save Changes'}
+                    </Button>
+                  </Box>
+                </Box>
+              ) : (
                 <ReviewCard
                   key={review._id}
                   review={review}
-                  onEdit={onEditReview}
+                  canEdit={user?._id === review.user?._id}
+                  onEdit={() => setEditingReview(review)}
                 />
-              ))}
-            </Box>
-          ) : (
-            <Box className="py-12 text-center">
-              <Typography className="text-slate-500">No reviews yet</Typography>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions className="border-t border-slate-200 bg-slate-50">
-          <Button
-            onClick={onClose}
-            className="text-slate-700 hover:text-slate-900"
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
-    );
-  }
-);
+              )
+            ))}
+          </Box>
+        ) : (
+          <Typography>No reviews yet</Typography>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+});
 
 // EditReviewDialog Component
 const EditReviewDialog = memo(({ open, onClose, review, onUpdate }) => {
@@ -215,13 +237,14 @@ const EditReviewDialog = memo(({ open, onClose, review, onUpdate }) => {
       }}
     >
       <DialogTitle className="bg-slate-50 border-b border-slate-200">
-        <Typography
-          variant="h6"
-          className="font-sans font-medium tracking-wide"
-        >
-          Edit Your Review
-        </Typography>
-      </DialogTitle>
+  <Typography
+    component="div" // Change from h6 to div
+    variant="h6"
+    className="font-sans font-medium tracking-wide"
+  >
+    Edit Your Review
+  </Typography>
+</DialogTitle>
       <DialogContent className="py-6">
         <Box className="space-y-6">
           <Box className="flex flex-col gap-2">
@@ -483,33 +506,38 @@ const ProductDisplay = () => {
   // Fetch Reviews
   const fetchReviews = useCallback(async (productId) => {
     try {
-      setState((prev) => ({
-        ...prev,
-        loadingReviews: { ...prev.loadingReviews, [productId]: true },
-      }));
-
+      console.log('Fetching reviews for product:', productId);
+      updateState({
+        loadingReviews: {
+          ...state.loadingReviews,
+          [productId]: true
+        }
+      });
+  
       const response = await productApi.getProductReviews(productId);
-
-      setState((prev) => ({
-        ...prev,
+      console.log('Reviews response:', response);
+  
+      // Extract reviews from response.data
+      const reviews = response?.data || [];
+      
+      updateState({
         reviews: {
-          ...prev.reviews,
-          [productId]: response,
+          ...state.reviews,
+          [productId]: reviews
         },
         loadingReviews: {
-          ...prev.loadingReviews,
-          [productId]: false,
-        },
-      }));
+          ...state.loadingReviews,
+          [productId]: false
+        }
+      });
     } catch (error) {
-      console.error("Error fetching reviews:", error);
-      setState((prev) => ({
-        ...prev,
+      console.error('Error fetching reviews:', error);
+      updateState({
         loadingReviews: {
-          ...prev.loadingReviews,
-          [productId]: false,
-        },
-      }));
+          ...state.loadingReviews,
+          [productId]: false
+        }
+      });
     }
   }, []);
 
@@ -564,15 +592,12 @@ const ProductDisplay = () => {
     });
   };
 
-  const handleOpenReviews = useCallback(
-    async (product) => {
-      setSelectedProduct(product);
-      setReviewModalOpen(true);
-      await fetchReviews(product._id);
-    },
-    [fetchReviews]
-  );
-
+  const handleOpenReviews = useCallback(async (product) => {
+    console.log('Opening reviews for product:', product._id);
+    setSelectedProduct(product);
+    setReviewModalOpen(true);
+    await fetchReviews(product._id);
+  }, [fetchReviews]);
   const handleCloseReviews = () => {
     setReviewModalOpen(false);
     setSelectedProduct(null);
@@ -761,19 +786,21 @@ const ProductDisplay = () => {
 
             {/* Modals */}
             <ReviewModal
-              open={reviewModalOpen}
-              onClose={handleCloseReviews}
-              product={selectedProduct}
-              reviews={
-                selectedProduct ? state.reviews[selectedProduct._id] || [] : []
-              }
-              loading={
-                selectedProduct
-                  ? !!state.loadingReviews[selectedProduct._id]
-                  : false
-              }
-              onEditReview={handleEditReview}
-            />
+  open={reviewModalOpen}
+  onClose={handleCloseReviews}
+  product={selectedProduct}
+  reviews={selectedProduct ? state.reviews[selectedProduct._id] : []}
+  loading={selectedProduct ? state.loadingReviews[selectedProduct._id] : false}
+  onEditReview={(updatedReviews) => {
+    if (!selectedProduct) return;
+    updateState({
+      reviews: {
+        ...state.reviews,
+        [selectedProduct._id]: updatedReviews
+      }
+    });
+  }}
+/>
 
             {editReview && (
               <EditReviewDialog

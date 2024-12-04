@@ -1,10 +1,15 @@
 import Review from '../models/reviews.js';
 import Product from '../models/product.js';
 import mongoose from 'mongoose';
-import Order from '../models/order.js'; 
+import Order from '../models/order.js';
+
 
 class ReviewController {
   // Utility method to handle async operations
+  debugLog(message, data) {
+    console.log(`[ReviewController] ${message}:`, JSON.stringify(data, null, 2));
+  }
+  
   asyncWrapper(fn) {
     return async (req, res, next) => {
       try {
@@ -24,17 +29,16 @@ class ReviewController {
     };
   }
 
+  // Create Review
   createReview = this.asyncWrapper(async (req, res) => {
     let session = null;
-    let review = null;  // Declare review here so it's accessible throughout the function
-  
+    let review = null;
+
     try {
       const { productId, orderId, rating, comment } = req.body;
-  
       session = await mongoose.startSession();
       
       await session.withTransaction(async () => {
-        // **Existence Check:** Verify if a review already exists for this user, product, and order
         const existingReview = await Review.findOne({ 
           user: req.user.id, 
           product: productId, 
@@ -42,13 +46,11 @@ class ReviewController {
         }).session(session);
         
         if (existingReview) {
-          // **Error Handling:** Throw a specific error to be caught and handled
           const error = new Error('You have already reviewed this product for this order.');
-          error.status = 400; // Bad Request
+          error.status = 400;
           throw error;
         }
-  
-        // **Create the Review:** Proceed to create the review if no duplicate exists
+
         review = new Review({
           user: req.user.id,
           product: productId,
@@ -59,62 +61,35 @@ class ReviewController {
         });
         
         await review.save({ session });
-  
-        // **Update the Order Item with the Review Reference**
+
         const updatedOrder = await Order.findOneAndUpdate(
-          { 
-            _id: orderId,
-            'items.product': productId 
-          },
-          { 
-            $set: { 'items.$.userReview': review._id }
-          },
-          { 
-            session,
-            new: true 
-          }
+          { _id: orderId, 'items.product': productId },
+          { $set: { 'items.$.userReview': review._id }},
+          { session, new: true }
         );
-  
-        if (!updatedOrder) {
-          throw new Error('Failed to update order with review');
-        }
-  
-        console.log('Review creation:', {
-          reviewId: review._id,
-          orderId,
-          productId,
-          orderUpdated: !!updatedOrder
-        });
-  
-        return review;
+
+        if (!updatedOrder) throw new Error('Failed to update order with review');
       });
-  
-      // **Fetch the Populated Review Data**
+
       const populatedReview = await Review.findById(review._id)
         .populate({
           path: 'user',
           select: 'displayName photoURL',
           populate: {
             path: 'profile',
-            select: 'firstName lastName' // Select fields from UserProfile
+            select: 'firstName lastName'
           }
         })
         .populate('product')
         .populate('order');
-  
+
       res.status(201).json({
         success: true,
         data: populatedReview
       });
-  
+
     } catch (error) {
-      console.error('Review creation error:', {
-        error: error.message,
-        productId: req.body.productId,
-        orderId: req.body.orderId
-      });
-  
-      // **Handle Specific Error for Duplicate Reviews**
+      console.error('Review creation error:', error);
       if (error.status === 400) {
         res.status(400).json({
           success: false,
@@ -127,172 +102,145 @@ class ReviewController {
         });
       }
     } finally {
-      if (session) {
-        await session.endSession();
-      }
+      if (session) await session.endSession();
     }
   });
-  
 
-
-  // Update existing review
- // Update existing review
- updateReview = this.asyncWrapper(async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
-    const { reviewId } = req.params;
-    const { rating, comment } = req.body;
-
-    // Find the existing review
-    const review = await Review.findById(reviewId).session(session);
-
-    if (!review) {
-      const error = new Error('Review not found');
-      error.status = 404;
-      throw error;
-    }
-
-    // Ensure user owns the review
-    if (review.user.toString() !== req.user.id.toString()) {
-      const error = new Error('Not authorized to update this review');
-      error.status = 403;
-      throw error;
-    }
-
-    // Store current review in edit history
-    review.editHistory.push({
-      rating: review.rating,
-      comment: review.comment,
-      editedAt: new Date()
-    });
-
-    // Update review details
-    review.rating = rating;
-    review.comment = comment;
-    review.isEdited = true;
-    review.version += 1;
-
-    // Recalculate product rating
-    const productReviews = await Review.find({ 
-      product: review.product,
-      _id: { $ne: reviewId } 
-    }).session(session);
-
-    const totalRating = productReviews.reduce((sum, r) => sum + r.rating, 0) + rating;
-    const newAverageRating = totalRating / (productReviews.length + 1);
-
-    // Update product rating
-    await Product.findByIdAndUpdate(
-      review.product, 
-      { 
-        $set: { 
-          'metadata.rating': newAverageRating 
-        }
-      }, 
-      { 
-        new: true, 
-        session 
-      }
-    );
-
-    // Save updated review
-    await review.save({ session });
-
-    // Commit transaction
-    await session.commitTransaction();
-    session.endSession();
-
-    res.status(200).json({
-      success: true,
-      data: review
-    });
-  } catch (error) {
-    // Abort transaction on error
-    await session.abortTransaction();
-    session.endSession();
-
-    throw error; // Re-throw to be caught by asyncWrapper
-  }
-});
-
-
-  // Get reviews for a specific product
-  getProductReviews = this.asyncWrapper(async (req, res) => {
+  updateReview = this.asyncWrapper(async (req, res) => {
+    let session = null;
     try {
-      const { productId } = req.params;
-  
-      // Validate productId
-      if (!productId) {
-        return res.status(400).json({
+      // Check auth first
+      if (!req.user?.id) {
+        return res.status(401).json({
           success: false,
-          message: 'Product ID is required'
+          message: 'Authentication required'
         });
       }
   
-      console.log('Fetching reviews for product:', productId);
-      
-      // Fetch reviews with populated user and order data
-      const reviews = await Review.find({ product: productId })
-        .populate({
-          path: 'user',
-          select: 'displayName email photoURL',
-          populate: {
-            path: 'profile',
-            select: 'firstName lastName'
-          }
-        })
-        .populate('order', 'orderNumber')
-        .sort('-createdAt');
+      const { reviewId } = req.params;
+      const { rating, comment } = req.body;
   
-      console.log('Found reviews:', reviews);
+      session = await mongoose.startSession();
+      await session.withTransaction(async () => {
+        // Find review
+        const review = await Review.findById(reviewId)
+          .populate('user')
+          .session(session);
   
-      // Format response with user details
-      const formattedReviews = reviews.map(review => ({
-        _id: review._id,
-        rating: review.rating,
-        comment: review.comment,
-        createdAt: review.createdAt,
-        updatedAt: review.updatedAt,
-        user: {
-          _id: review.user?._id,
-          displayName: review.user?.displayName || review.user?.email || 'Anonymous',
-          email: review.user?.email,
-          photoURL: review.user?.photoURL,
-          profile: review.user?.profile
-        },
-        order: {
-          _id: review.order?._id,
-          orderNumber: review.order?.orderNumber
-        },
-        product: review.product,
-        version: review.version,
-        editHistory: review.editHistory
-      }));
+        if (!review) {
+          throw new Error('Review not found');
+        }
   
-      return res.status(200).json({
-        success: true,
-        count: reviews.length,
-        data: formattedReviews
+        // Get user IDs as strings
+        const reviewUserId = review.user._id.toString();
+        const requestUserId = req.user.id.toString();
+  
+        console.log('Auth check:', {
+          reviewUserId,
+          requestUserId,
+          match: reviewUserId === requestUserId
+        });
+  
+        // Compare string IDs
+        if (reviewUserId !== requestUserId) {
+          const error = new Error('Not authorized');
+          error.status = 403;
+          throw error;
+        }
+  
+        // Update review
+        review.rating = rating;
+        review.comment = comment;
+        review.version = (review.version || 0) + 1;
+        review.editHistory = review.editHistory || [];
+        review.editHistory.push({
+          rating,
+          comment,
+          editedAt: new Date()
+        });
+  
+        await review.save({ session });
+  
+        const updatedReview = await Review.findById(reviewId)
+          .populate('user', 'displayName email photoURL')
+          .populate('order', 'orderNumber')
+          .session(session);
+  
+        res.json({
+          success: true,
+          data: updatedReview
+        });
       });
   
     } catch (error) {
-      console.error('Review Controller Error:', {
-        error: error.message,
-        stack: error.stack,
-        user: req.user?._id,
-        body: req.body
+      console.error('Review update error:', {
+        message: error.message,
+        userId: req.user?.id,
+        reviewId
       });
   
-      return res.status(500).json({
+      res.status(error.status || 500).json({
         success: false,
-        message: 'Failed to fetch reviews'
+        message: error.message
       });
+    } finally {
+      if (session) await session.endSession();
     }
   });
 
-  // Get user's own reviews
+  // Get Product Reviews
+  getProductReviews = this.asyncWrapper(async (req, res) => {
+    const { productId } = req.params;
+    
+    if (!productId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Product ID is required'
+      });
+    }
+
+    const reviews = await Review.find({ product: productId })
+      .populate({
+        path: 'user',
+        select: 'displayName email photoURL',
+        populate: {
+          path: 'profile',
+          select: 'firstName lastName'
+        }
+      })
+      .populate('order', 'orderNumber')
+      .sort('-createdAt');
+
+    const formattedReviews = reviews.map(review => ({
+      _id: review._id,
+      rating: review.rating,
+      comment: review.comment,
+      createdAt: review.createdAt,
+      updatedAt: review.updatedAt,
+      user: {
+        _id: review.user?._id,
+        displayName: review.user?.displayName || review.user?.email || 'Anonymous',
+        email: review.user?.email,
+        photoURL: review.user?.photoURL,
+        profile: review.user?.profile
+      },
+      order: {
+        _id: review.order?._id,
+        orderNumber: review.order?.orderNumber
+      },
+      product: review.product,
+      version: review.version,
+      editHistory: review.editHistory
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: reviews.length,
+      data: formattedReviews
+    });
+  });
+
+  // Get User Reviews
   getUserReviews = this.asyncWrapper(async (req, res) => {
     const reviews = await Review.find({ user: req.user.id })
       .populate({
@@ -308,14 +256,11 @@ class ReviewController {
     });
   });
 
-  // Delete a review (admin only)
+  // Delete Review
   deleteReview = this.asyncWrapper(async (req, res) => {
     const { reviewId } = req.params;
-
     const session = await mongoose.startSession();
-    session.startTransaction();
-
-    try {
+    await session.withTransaction(async () => {
       const review = await Review.findById(reviewId).session(session);
 
       if (!review) {
@@ -324,7 +269,6 @@ class ReviewController {
         throw error;
       }
 
-      // Recalculate product rating after deletion
       const remainingReviews = await Review.find({ 
         product: review.product,
         _id: { $ne: reviewId } 
@@ -334,7 +278,6 @@ class ReviewController {
         ? remainingReviews.reduce((sum, r) => sum + r.rating, 0) / remainingReviews.length 
         : 0;
 
-      // Update product rating
       await Product.findByIdAndUpdate(
         review.product, 
         { 
@@ -342,31 +285,17 @@ class ReviewController {
             'metadata.rating': newAverageRating,
             'metadata.ratingCount': remainingReviews.length
           }
-        }, 
-        { 
-          new: true, 
-          session 
-        }
+        },
+        { new: true, session }
       );
 
-      // Remove the review
       await review.deleteOne({ session });
+    });
 
-      // Commit transaction
-      await session.commitTransaction();
-      session.endSession();
-
-      res.status(200).json({
-        success: true,
-        data: {}
-      });
-    } catch (error) {
-      // Abort transaction on error
-      await session.abortTransaction();
-      session.endSession();
-
-      throw error; // Re-throw to be caught by asyncWrapper
-    }
+    res.status(200).json({
+      success: true,
+      data: {}
+    });
   });
 }
 
