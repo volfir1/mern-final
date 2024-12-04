@@ -168,22 +168,51 @@ export function AuthProvider({ children }) {
     async logout() {
       try {
         updateState({ loading: true });
-        await logoutAction(navigate);
+        // Call the logout action with proper parameters
+        await logout(navigate);  // passing navigate directly
+        
+        // Clear local state
         updateState({
           user: null,
           isAuthenticated: false,
           error: null
         });
-        navigate('/login');
+    
+        // Clear tokens and storage
+        await TokenManager.clearAuth();
+        
+        // Navigate last
+        navigate('/login', { replace: true });
+        
+        toast.success('Logged out successfully');
       } catch (err) {
+        console.error('Logout error:', err);
         toast.error(err.message || 'Logout failed');
-        throw err;
+        
+        // Ensure state is cleaned up even on error
+        updateState({
+          user: null,
+          isAuthenticated: false,
+          error: err.message
+        });
+        await TokenManager.clearAuth();
+        navigate('/login', { replace: true });
       } finally {
         updateState({ loading: false });
       }
-    }
+    },
+    
   };
-
+  const cleanupAuthState = async () => {
+    await TokenManager.clearAuth();
+    updateState({
+      user: null,
+      isAuthenticated: false,
+      roleLoaded: false,
+      error: null
+    });
+  };
+  
   if (state.loading) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80">

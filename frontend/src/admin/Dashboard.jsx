@@ -1,7 +1,7 @@
 // src/admin/dashboard/SalesDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { LineChart, BarChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Line, Bar, ResponsiveContainer } from 'recharts';
-import { DollarSign, TrendingUp, ShoppingBag, Calendar, Users } from 'lucide-react';
+import { DollarSign, TrendingUp, ShoppingBag, Calendar } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { useOrderApi } from '@/api/orderApi';
@@ -41,26 +41,14 @@ const SalesDashboard = () => {
     totalSales: 0,
     avgOrderValue: 0,
     orderCount: 0,
-    userCount: 0,
     growth: 0
   });
   
   const orderApi = useOrderApi();
 
-  const fetchUserCount = async () => {
-    try {
-      const response = await api.get('/users/count');
-      return response.data.count;
-    } catch (error) {
-      console.error('Error fetching user count:', error);
-      return 0;
-    }
-  };
-
   const fetchSalesData = async () => {
     try {
-      const [ordersResponse, userCount] = await Promise.all([orderApi.getAllOrders(), fetchUserCount()]);
-      
+      const ordersResponse = await orderApi.getAllOrders();
       const orders = ordersResponse.data;
 
       // Process monthly data
@@ -78,12 +66,7 @@ const SalesDashboard = () => {
         return acc;
       }, {});
 
-      // Create a full list of months for the year (January to December)
-      const months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-      ];
-
-      // Ensure all months are represented in the data
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       const fullMonthlyStats = months.map(month => ({
         name: month,
         sales: monthlyStats[month]?.sales || 0,
@@ -101,7 +84,6 @@ const SalesDashboard = () => {
       const dailyStats = filtered.reduce((acc, order) => {
         if (order.orderStatus === 'DELIVERED') {
           const date = new Date(order.createdAt).toLocaleDateString();
-          
           if (!acc[date]) {
             acc[date] = { name: date, sales: 0, orders: 0 };
           }
@@ -124,7 +106,6 @@ const SalesDashboard = () => {
         totalSales,
         avgOrderValue: orderCount ? totalSales / orderCount : 0,
         orderCount,
-        userCount,
         growth: 12.5
       });
 
@@ -145,7 +126,7 @@ const SalesDashboard = () => {
         <h1 className="text-3xl font-bold mb-8 text-gray-800">Sales Analytics</h1>
         
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard 
             icon={DollarSign} 
             title="Total Sales" 
@@ -167,12 +148,6 @@ const SalesDashboard = () => {
             trend={8.1}
             isCurrency={false}
           />
-          {/* <StatCard 
-            icon={Users} 
-            title="Total Users" 
-            value={stats.userCount}
-            isCurrency={false}
-          /> */}
           <StatCard 
             icon={Calendar} 
             title="Date Range" 
@@ -188,14 +163,14 @@ const SalesDashboard = () => {
             <h2 className="text-2xl font-semibold text-gray-800 mb-6">Monthly Sales Overview</h2>
             <div className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={monthlyData}>
-  <CartesianGrid strokeDasharray="3 3" />
-  <XAxis dataKey="name" />
-  <YAxis />
-  <Tooltip />
-  <Legend />
-  <Line type="monotone" dataKey="sales" stroke="#3b82f6" name="Sales (₱)" />
-</LineChart>
+                <LineChart data={monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="sales" stroke="#3b82f6" name="Sales (₱)" />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
@@ -228,15 +203,15 @@ const SalesDashboard = () => {
             </div>
             <div className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={filteredData}>
-  <CartesianGrid strokeDasharray="3 3" />
-  <XAxis dataKey="name" />
-  <YAxis />
-  <Tooltip />
-  <Legend />
-  <Line type="monotone" dataKey="sales" stroke="#34D399" name="Sales (₱)" />
-  <Line type="monotone" dataKey="orders" stroke="#F97316" name="Orders" />
-</LineChart>
+                <LineChart data={filteredData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="sales" stroke="#34D399" name="Sales (₱)" />
+                  <Line type="monotone" dataKey="orders" stroke="#F97316" name="Orders" />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </div>

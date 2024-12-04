@@ -87,56 +87,21 @@ const ReviewCard = memo(({ review, onEdit, canEdit }) => (
         </Box>
       </Box>
       {canEdit && (
-        <IconButton size="small" onClick={() => onEdit(review)} className="text-indigo-600 hover:text-indigo-800">
+        <IconButton
+          size="small"
+          onClick={() => onEdit(review)}
+          className="text-indigo-600 hover:text-indigo-800"
+        >
           <EditIcon fontSize="small" />
         </IconButton>
       )}
     </Box>
     <ReviewStars rating={review.rating} />
     <Typography variant="body2" className="mt-3">
-      {filter.clean(review.comment)}
-    </Typography>
+  {filter.clean(review.comment)}  {/* Add filter here */}
+</Typography>
   </Box>
 ));
-
-// ReviewModal Component editing section update
-{editingReview?._id === review._id ? (
-  <Box key={review._id} className="p-4 border rounded">
-    <Rating
-      value={editingReview.rating}
-      onChange={(_, value) => setEditingReview(prev => ({ ...prev, rating: value }))}
-      disabled={submitting}
-    />
-    <TextField
-      fullWidth
-      multiline
-      rows={4}
-      value={filter.clean(editingReview.comment)}
-      onChange={(e) => setEditingReview(prev => ({ ...prev, comment: e.target.value }))}
-      disabled={submitting}
-      className="mt-3"
-    />
-    <Box className="mt-3 flex justify-end gap-2">
-      <Button onClick={() => setEditingReview(null)} disabled={submitting}>
-        Cancel
-      </Button>
-      <Button
-        variant="contained"
-        onClick={() => handleEditSubmit(editingReview)}
-        disabled={submitting}
-      >
-        {submitting ? <CircularProgress size={20} /> : 'Save Changes'}
-      </Button>
-    </Box>
-  </Box>
-) : (
-  <ReviewCard
-    key={review._id}
-    review={review}
-    canEdit={user?._id === review.user?._id}
-    onEdit={() => setEditingReview(review)}
-  />
-)}
 
 // ReviewModal Component
 const ReviewModal = memo(({ open, onClose, product, reviews = [], loading = false, onEditReview }) => {

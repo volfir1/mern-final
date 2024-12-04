@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { toast } from "react-toastify";
 import { useReviewApi } from "@/api/reviewApi";
 import Sidebar from "@/components/sidebar/Sidebar"; // Ensure this is the correct path for your Sidebar component
+import leoProfanity from "leo-profanity"; // Import the leo-profanity package
 
 const ReviewsTable = () => {
   const [reviews, setReviews] = useState([]);
@@ -42,16 +43,16 @@ const ReviewsTable = () => {
           user: {
             email: review.user?.email,
             displayName: review.user?.displayName,
-            photoURL: review.user?.photoURL
+            photoURL: review.user?.photoURL,
           },
           product: {
             name: review.product?.name,
-            title: review.product?.title
+            title: review.product?.title,
           },
           rating: Number(review.rating) || 0,
-          comment: review.comment || '',
+          comment: leoProfanity.clean(review.comment || ''),  // Clean the comment for profanity
           createdAt: review.createdAt,
-          order: review.order
+          order: review.order,
         }));
 
         setReviews(reviewsData);
@@ -179,108 +180,110 @@ const ReviewsTable = () => {
   }
 
   return (
-    <Box
-      className="flex w-85 min-h-screen bg-gray-100"
-      sx={{
-        display: "flex",
-        flexDirection: "row",
-      }}
-    >
-      {/* Sidebar Section */}
-      <Sidebar />  {/* Re-imported and used the Sidebar component here */}
-
-      {/* Main Content Section (Table) */}
+    <Box className="flex min-h-screen bg-neutral-50">
+      <Sidebar />
       <Box
-        className="flex-1 p-4"
+        className="flex-1 p-6 transition-all duration-300"
         sx={{
-          backgroundColor: "#fff",
-          paddingLeft: "20px",
-          paddingRight: "20px",
-          paddingTop: "20px",
+          marginLeft: '80px', // Default sidebar width (w-20)
+          '@media (min-width: 1024px)': {
+            marginLeft: '80px', // Keep margin consistent
+          }
         }}
       >
-        <Box className="h-[800px] w-full bg-white rounded-lg shadow-sm"> {/* Increased height */}
-        <DataGrid
-  rows={reviews || []}
-  columns={columns}
-  getRowId={(row) => row.id}
-  loading={loading}
-  pageSizeOptions={[10, 25, 50]}
-  initialState={{
-    pagination: {
-      paginationModel: { pageSize: 10 },
-    },
-    sorting: {
-      sortModel: [{ field: "createdAt", sort: "desc" }],
-    },
-  }}
-  className="border-none"
-  disableRowSelectionOnClick
-  sx={{
-    width: '90%',  // Set width of the DataGrid to be 90% of the available space (or adjust as needed)
-    margin: '0 auto',  // Centers the table horizontally
-    "& .MuiDataGrid-cell": {
-      borderBottom: "1px solid #f0f0f0",
-    },
-  }}
-  components={{
-    NoRowsOverlay: () => (
-      <Box
-        sx={{
-          display: "flex",
-          height: "100%",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Typography>No reviews found</Typography>
-      </Box>
-    ),
-  }}
-/>
+        <Typography variant="h5" className="font-medium text-neutral-800 mb-6">
+          Review Management
+        </Typography>
 
+        <Box
+          className="bg-white rounded-lg shadow-sm border border-neutral-200 overflow-hidden"
+          sx={{
+            height: 'calc(100vh - 180px)', // Adjust height accounting for header and padding
+            width: 'calc(100vw - 120px)', // Adjust width accounting for sidebar and padding
+          }}
+        >
+          <DataGrid
+            rows={reviews || []}
+            columns={columns}
+            getRowId={(row) => row.id}
+            loading={loading}
+            pageSizeOptions={[10, 25, 50]}
+            initialState={{
+              pagination: { paginationModel: { pageSize: 10 } },
+              sorting: { sortModel: [{ field: "createdAt", sort: "desc" }] },
+            }}
+            className="border-none"
+            disableRowSelectionOnClick
+            sx={{
+              '& .MuiDataGrid-main': {
+                padding: '1rem',
+              },
+              '& .MuiDataGrid-cell': {
+                borderBottom: '1px solid #f0f0f0',
+                padding: '1rem',
+                fontSize: '0.875rem',
+              },
+              '& .MuiDataGrid-columnHeaders': {
+                backgroundColor: '#f9fafb',
+                borderBottom: '1px solid #e5e7eb',
+                minHeight: '3.5rem !important',
+              },
+              '& .MuiDataGrid-columnHeader': {
+                padding: '0 1rem',
+              },
+              '& .MuiDataGrid-row': {
+                minHeight: '4rem !important',
+              },
+              '& .MuiDataGrid-row:hover': {
+                backgroundColor: '#f9fafb',
+              },
+              '& .MuiDataGrid-footerContainer': {
+                borderTop: '1px solid #e5e7eb',
+                backgroundColor: '#f9fafb',
+              },
+              '& .MuiTablePagination-root': {
+                padding: '1rem',
+              }
+            }}
+            components={{
+              NoRowsOverlay: () => (
+                <Box className="flex h-[400px] items-center justify-center text-neutral-500">
+                  <Typography>No reviews found</Typography>
+                </Box>
+              ),
+              LoadingOverlay: () => (
+                <Box className="flex h-full items-center justify-center">
+                  <CircularProgress />
+                </Box>
+              ),
+            }}
+          />
         </Box>
-      </Box>
 
-      {/* Delete Dialog */}
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => !deleting && setDeleteDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle className="bg-slate-50 border-b">
-          Delete Review
-        </DialogTitle>
-        <DialogContent className="mt-4">
-          <Typography>
-            Are you sure you want to delete this review? This action cannot be
-            undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions className="bg-slate-50 border-t p-4">
-          <Button
-            onClick={() => setDeleteDialogOpen(false)}
-            disabled={deleting}
-            className="text-slate-600"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeleteConfirm}
-            disabled={deleting}
-            color="error"
-            variant="contained"
-            className="bg-red-500 hover:bg-red-600"
-          >
-            {deleting ? (
-              <CircularProgress size={20} className="text-white" />
-            ) : (
-              "Delete Review"
-            )}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+          <DialogTitle>Delete Review</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2">
+              Are you sure you want to delete the review from{" "}
+              <strong>{selectedReview?.user?.email || 'Unknown user'}</strong>?
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handleDeleteConfirm}
+              color="error"
+              disabled={deleting}
+            >
+              {deleting ? (
+                <CircularProgress size={20} />
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Box>
     </Box>
   );
 };
