@@ -1,0 +1,153 @@
+/* Base variables */
+:root {
+    --primary-blue: #2B3990;
+    --secondary-purple: #6B4E71;
+    --accent-lavender: #9B8EB5;
+    --neutral-light: #F5F5F7;
+    --neutral-dark: #1D1D1F;
+    --grid-unit: 8px;
+    --border-radius: 4px;
+    --transition-speed: 0.3s;
+  }
+  
+  /* Container styles */
+  .min-h-screen {
+    min-height: 100vh;
+    background: linear-gradient(135deg, var(--neutral-light) 0%, #FFFFFF 100%);
+    padding: calc(var(--grid-unit) * 3);
+  }
+  
+  /* Paper component override */
+  .MuiPaper-root {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(var(--primary-blue), 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08) !important;
+    border-radius: calc(var(--grid-unit) * 2) !important;
+  }
+  
+  /* Typography enhancements */
+  .MuiTypography-h4 {
+    font-family: 'Helvetica Neue', sans-serif !important;
+    letter-spacing: -0.5px !important;
+    margin-bottom: calc(var(--grid-unit) * 2) !important;
+  }
+  
+  /* Form elements styling */
+  .MuiTextField-root {
+    margin-bottom: calc(var(--grid-unit) * 2) !important;
+  }
+  
+  .MuiOutlinedInput-root {
+    border-radius: var(--border-radius) !important;
+    transition: all var(--transition-speed) ease-in-out;
+  }
+  
+  .MuiOutlinedInput-root:hover {
+    background: var(--neutral-light);
+  }
+  
+  .MuiOutlinedInput-root.Mui-focused {
+    background: white;
+    box-shadow: 0 0 0 2px var(--primary-blue);
+  }
+  
+  /* Button styling */
+  .MuiButton-contained {
+    background: linear-gradient(45deg, var(--primary-blue), var(--secondary-purple)) !important;
+    text-transform: none !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.5px !important;
+    transition: all var(--transition-speed) ease-in-out !important;
+  }
+  
+  .MuiButton-contained:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(43, 57, 144, 0.2) !important;
+  }
+  
+  .MuiButton-outlined {
+    border: 2px solid var(--accent-lavender) !important;
+    color: var(--secondary-purple) !important;
+    background: transparent !important;
+    transition: all var(--transition-speed) ease-in-out !important;
+  }
+  
+  .MuiButton-outlined:hover {
+    background: var(--neutral-light) !important;
+    border-color: var(--secondary-purple) !important;
+  }
+  
+  /* Icons styling */
+  .MuiSvgIcon-root {
+    color: var(--accent-lavender) !important;
+    transition: color var(--transition-speed) ease-in-out;
+  }
+  
+  .Mui-focused .MuiSvgIcon-root {
+    color: var(--primary-blue) !important;
+  }
+  
+  /* Alert component styling */
+  .MuiAlert-root {
+    border-radius: var(--border-radius) !important;
+    font-weight: 500 !important;
+  }
+  
+  .MuiAlert-standardError {
+    background-color: rgba(211, 47, 47, 0.05) !important;
+    border: 1px solid rgba(211, 47, 47, 0.2) !important;
+  }
+  
+  /* Divider styling */
+  .MuiDivider-root {
+    margin: calc(var(--grid-unit) * 3) 0 !important;
+  }
+  
+  /* Link styling */
+  .MuiLink-root {
+    color: var(--primary-blue) !important;
+    text-decoration: none !important;
+    font-weight: 500 !important;
+    transition: all var(--transition-speed) ease-in-out;
+  }
+  
+  .MuiLink-root:hover {
+    color: var(--secondary-purple) !important;
+    text-decoration: underline !important;
+  }
+  
+  /* Loading state */
+  .MuiCircularProgress-root {
+    color: white !important;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 600px) {
+    .MuiContainer-root {
+      padding: var(--grid-unit) !important;
+    }
+    
+    .MuiPaper-root {
+      padding: calc(var(--grid-unit) * 2) !important;
+    }
+  }
+  
+  /* Animation for form elements */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .MuiTextField-root,
+  .MuiButton-root,
+  .MuiLink-root {
+    animation: fadeIn 0.5s ease-out forwards;
+    animation-delay: calc(var(--animation-order) * 0.1s);
+  }

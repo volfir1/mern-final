@@ -22,6 +22,7 @@ import {
   Lock,
   Google
 } from '@mui/icons-material';
+import '../css/login.css';
 
 const Login = () => {
   const navigate = useNavigate();

@@ -99,7 +99,7 @@ const AppRoutes = () => {
     }
 
     if (!auth.isAuthenticated) {
-      return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+      return <Navigate to="/homepage" state={{ from: location.pathname }} replace />;
     }
 
     if (!auth.user?.role || !allowedRoles.includes(auth.user.role)) {

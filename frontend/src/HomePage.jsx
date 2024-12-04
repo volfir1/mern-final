@@ -1,338 +1,255 @@
-import React, { useState } from 'react';
-import './HomePage.css';  // Importing the CSS file in the same directory
-import { Link } from 'react-router-dom';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Star, CheckCircle, Truck, Shield, Phone } from 'lucide-react';
+import { Button } from "@/components/ui/button";
 
-// The list of products (using your data)
-const products = [
+const sampleProducts = [
   {
-    id: 1,
-    name: 'AirPods 2',
-    price: 999,
-    image: './images/ap2_rm.png',
-    description: 'Latest model of iPhone with advanced features.'
+    _id: 1,
+    name: "Pro Laptop X1",
+    category: "Laptops", 
+    price: 1299,
+    rating: 4.8,
+    description: "High-performance laptop with cutting-edge features",
+    images: ["https://i.ibb.co/wSHKSNw/laptop.jpg"]
   },
   {
-    id: 2,
-    name: 'AirPods 4',
-    price: 1999,
-    image: './images/ap4_rm.png',
-    description: 'Powerful laptop with M1 chip and long battery life.'
+    _id: 2,
+    name: "SmartPhone Ultra",
+    category: "Phones",
+    price: 899,
+    rating: 4.9,
+    description: "Next-generation smartphone with advanced camera system",
+    images: ["https://i.ibb.co/z83Rk5t/phone.jpg"]
   },
   {
-    id: 3,
-    name: 'AirPods Max',
-    price: 699,
-    image: './images/apMax_rm.png',
-    description: 'Compact camera with 4K recording and Wi-Fi.'
+    _id: 3, 
+    name: "Tablet Pro Max",
+    category: "Tablets",
+    price: 649,
+    rating: 4.7,
+    description: "Professional tablet for creators and designers",
+    images: ["https://i.ibb.co/1QG82K2/tablet.jpg"]
   },
   {
-    id: 4,
-    name: 'Apple Watch S10',
-    price: 499,
-    image: './images/awS10_rm.png',
-    description: 'Lightweight tablet with a stunning display.'
-  },
-  {
-    id: 5,
-    name: 'Apple Watch SE',
-    price: 19.99,
-    image: './images/awSE_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 6,
-    name: 'Apple Watch U2',
+    _id: 4,
+    name: "Wireless Earbuds Pro",
+    category: "Audio",
     price: 199,
-    image: './images/awU2_rm.png',
-    description: 'High-quality noise-cancelling headphones.'
+    rating: 4.6,
+    description: "Premium wireless earbuds with active noise cancellation",
+    images: ["https://i.ibb.co/vqvCqtB/earbuds.jpg"]
   },
   {
-    id: 7,
-    name: 'iPhone 14',
-    price: 19.99,
-    image: './images/ip14_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
+    _id: 5,
+    name: "Smart Watch Elite",
+    category: "Wearables",
+    price: 299,
+    rating: 4.5,
+    description: "Advanced smartwatch with health monitoring features", 
+    images: ["https://i.ibb.co/WcpLL0r/watch.jpg"]
   },
   {
-    id: 8,
-    name: 'iPhone 15',
-    price: 19.99,
-    image: './images/ip15_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 9,
-    name: 'iPhone 16',
-    price: 19.99,
-    image: './images/ip16_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 10,
-    name: 'iPad',
-    price: 19.99,
-    image: './images/ipad_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 11,
-    name: 'iPad Air',
-    price: 19.99,
-    image: './images/ipadAir_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 12,
-    name: 'iPad Mini',
-    price: 19.99,
-    image: './images/ipadMini_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 13,
-    name: 'iPad Pro',
-    price: 19.99,
-    image: './images/ipadPro_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 14,
-    name: 'Mac 13',
-    price: 19.99,
-    image: './images/mac13_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 15,
-    name: 'Mac 14',
-    price: 19.99,
-    image: './images/mac14_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 16,
-    name: 'Galaxy Z Fold6',
-    price: 19.99,
-    image: './images/s1_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 17,
-    name: 'Galaxy S24 FE',
-    price: 19.99,
-    image: './images/s2_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 18,
-    name: 'Galaxy S24',
-    price: 19.99,
-    image: './images/s3_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 19,
-    name: 'Galaxy A16 5G',
-    price: 19.99,
-    image: './images/s4_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 20,
-    name: '65" Neo QLED 4K QN87D Tizen OS Smart AI TV (2024)',
-    price: 19.99,
-    image: './images/s6_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 21,
-    name: '34" ViewFinity S6 S65TC UWQHD Monitor',
-    price: 19.99,
-    image: './images/s7_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 22,
-    name: 'ZV-1F',
-    price: 19.99,
-    image: './images/sony1_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 23,
-    name: 'ZV-1',
-    price: 19.99,
-    image: './images/sony2_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 24,
-    name: 'RX100 VII Compact Camera, Unrivaled AF',
-    price: 19.99,
-    image: './images/sony3_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 25,
-    name: 'RX0 II premium tiny tough camera',
-    price: 19.99,
-    image: './images/sony4_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 26,
-    name: 'BRAVIA 8',
-    price: 19.99,
-    image: './images/sony5_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 27,
-    name: 'New XPS 13',
-    price: 19.99,
-    image: './images/D1_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 28,
-    name: 'XPS 13',
-    price: 19.99,
-    image: './images/D2_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 29,
-    name: 'XPS 14',
-    price: 19.99,
-    image: './images/D3_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 30,
-    name: 'XPS Desktop',
-    price: 19.99,
-    image: './images/D4_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 31,
-    name: 'OptiPlex Micro Form Factor',
-    price: 19.99,
-    image: './images/D5_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 32,
-    name: 'HP Smart Tank 7301 All-in-One Printer',
-    price: 19.99,
-    image: './images/HP1_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 33,
-    name: 'HP OfficeJet Pro 8135e Wireless All-in-One Printer',
-    price: 19.99,
-    image: './images/HP2_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 34,
-    name: 'HP OfficeJet 200 Mobile Printer',
-    price: 19.99,
-    image: './images/HP3_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 35,
-    name: 'HP 325 FHD Webcam for business',
-    price: 19.99,
-    image: './images/HP4_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
-  },
-  {
-    id: 36,
-    name: 'Poly Studio R30 USB Video Bar',
-    price: 19.99,
-    image: './images/HP5_rm.png',
-    description: 'Colorful LED lights for decorating your room.'
+    _id: 6,
+    name: "Gaming Console X",
+    category: "Gaming",
+    price: 499,
+    rating: 4.9,
+    description: "Next-gen gaming console for immersive gaming experience",
+    images: ["https://i.ibb.co/vPqxZYt/console.jpg"]
   }
-
-
-
 ];
 
-const Home = () => {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [productsPerPage] = useState(4); // Number of products per page changed to 4
+const features = [
+  {
+    icon: <Shield className="w-16 h-16" />,
+    title: "Premium Quality",
+    description: "Only the finest tech products from trusted brands worldwide"
+  },
+  {
+    icon: <Truck className="w-16 h-16" />,
+    title: "Fast Delivery",
+    description: "Free shipping on orders over $100 with same-day delivery"
+  },
+  {
+    icon: <Phone className="w-16 h-16" />,
+    title: "24/7 Support",
+    description: "Expert assistance available around the clock for your needs"
+  }
+];
 
-  // Calculate the index of the last product on the current page
-  const indexOfLastProduct = currentPage * productsPerPage;
-  const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
+const ProductCard = ({ product }) => (
+  <Card className="group transition-all duration-300 hover:shadow-xl">
+    <CardContent className="p-6">
+      <div className="aspect-square w-full overflow-hidden bg-indigo-50 mb-6">
+        <img
+          src={product.images[0]}
+          alt={product.name}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      </div>
+      <div className="space-y-3">
+        <Badge className="bg-indigo-100 text-indigo-900 hover:bg-indigo-200">
+          {product.category}
+        </Badge>
+        <h3 className="font-mono text-xl text-indigo-900">
+          {product.name}
+        </h3>
+        <p className="text-2xl font-mono text-indigo-900">
+          ${product.price.toLocaleString()}
+        </p>
+        <div className="flex items-center gap-2">
+          <Star className="h-5 w-5 text-indigo-600 fill-current" />
+          <span className="font-mono text-sm">{product.rating}</span>
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+);
 
-  // Get the current products to display
-  const currentProducts = products.slice(indexOfFirstProduct, indexOfLastProduct);
-
-  // Calculate the total number of pages
-  const totalPages = Math.ceil(products.length / productsPerPage);
-
-  // Handle previous page
-  const goToPreviousPage = () => {
-    setCurrentPage((prevPage) => Math.max(prevPage - 1, 1)); // Ensure we don't go below 1
-  };
-
-  // Handle next page
-  const goToNextPage = () => {
-    setCurrentPage((prevPage) => Math.min(prevPage + 1, totalPages)); // Ensure we don't go above total pages
-  };
+const LandingPage = () => {
+  const navigate = useNavigate();
 
   return (
-    <div className="home" style={{ paddingBottom: '100px' }}> {/* Added padding for pagination space */}
-      <div className="main-container">
-        <div className="text-container">
-          <h1 className="h1">Welcome to Our Store</h1>
-          <p>Explore our products and enjoy the best deals.</p>
-          <Link to="/shop">
-            <button className="access-button">Shop Now</button>
-          </Link>
-        </div>
-        <div className="image-container">
-          <img className="image-style" src="./images/ip16_rm.png" />
-        </div>
-      </div>
-
-      <div className="products-container">
-        {currentProducts.map((product) => (
-          <div key={product.id} className="product-card">
-            <img className="product-image" src={product.image} alt={product.name} />
-            <div className="product-info">
-              <h3>{product.name}</h3>
-              <p>{product.description}</p>
-              <span>${product.price}</span>
+    <div className="min-h-screen bg-white">
+      <header className="fixed top-0 w-full z-50 bg-white border-b-2 border-indigo-900">
+        <div className="container mx-auto px-8">
+          <div className="flex h-24 items-center justify-between">
+            <h1 
+              className="text-3xl font-mono text-indigo-900 cursor-pointer tracking-tight"
+              onClick={() => navigate('/')}
+            >
+              Gadget Galaxy
+            </h1>
+            <div className="flex items-center gap-6">
+              <Button 
+                variant="outline"
+                className="rounded-none border-2 border-indigo-900 text-indigo-900 hover:bg-indigo-50 font-mono"
+                onClick={() => navigate('/login')}
+              >
+                Sign In
+              </Button>
+              <Button 
+                className="rounded-none bg-indigo-900 hover:bg-indigo-800 font-mono"
+                onClick={() => navigate('/register')}
+              >
+                Get Started
+              </Button>
             </div>
           </div>
-        ))}
-      </div>
+        </div>
+      </header>
 
-      {/* Pagination */}
-      <div className="pagination" style={{ textAlign: 'center', marginTop: '20px' }}>
-        <button
-          className="pagination-button"
-          onClick={goToPreviousPage}
-          disabled={currentPage === 1}
-        >
-          Previous
-        </button>
-        <span>Page {currentPage} of {totalPages}</span>
-        <button
-          className="pagination-button"
-          onClick={goToNextPage}
-          disabled={currentPage === totalPages}
-        >
-          Next
-        </button>
-      </div>
+      <main className="pt-24">
+        <section className="py-32 border-b-2 border-indigo-900 bg-gradient-to-br from-indigo-50 to-white">
+          <div className="container mx-auto px-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+              <div className="space-y-8">
+                <h2 className="text-6xl font-mono text-indigo-900 leading-tight">
+                  Premium Tech Excellence
+                </h2>
+                <p className="text-xl font-mono text-indigo-600">
+                  Discover cutting-edge technology curated for you.
+                </p>
+                <Button 
+                  size="lg"
+                  className="text-lg px-8 py-6 bg-indigo-900 hover:bg-indigo-800 font-mono rounded-none"
+                  onClick={() => navigate('/register')}
+                >
+                  Explore Collection
+                </Button>
+              </div>
+              <div className="hidden lg:block">
+  <img 
+    src="https://i.ibb.co/p2Lmchh/hero-image.jpg" 
+    alt="Hero" 
+    className="w-full h-auto rounded-lg shadow-2xl"
+    onError={(e) => {
+      e.target.onerror = null;
+      e.target.src = 'https://placehold.co/600x400/e2e8f0/475569?text=Hero+Image';
+    }}
+  />
+</div>
+            </div>
+          </div>
+        </section>
+
+        <section className="py-24">
+          <div className="container mx-auto px-8">
+            <h2 className="text-4xl font-mono text-center mb-16 text-indigo-900">
+              Why Choose Us?
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+              {features.map((feature, index) => (
+                <div key={index} className="text-center space-y-4 p-8 border-2 border-indigo-900">
+                  <div className="text-indigo-900 mx-auto">
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-2xl font-mono text-indigo-900">
+                    {feature.title}
+                  </h3>
+                  <p className="font-mono text-indigo-600">
+                    {feature.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="py-24 bg-indigo-50">
+          <div className="container mx-auto px-8">
+            <h2 className="text-4xl font-mono mb-16 text-indigo-900">
+              Featured Products
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {sampleProducts.slice(0, 6).map(product => (
+                <ProductCard key={product._id} product={product} />
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="bg-indigo-900 text-white py-16">
+        <div className="container mx-auto px-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
+            <div className="space-y-4">
+              <h3 className="text-2xl font-mono">GG</h3>
+              <p className="font-mono text-indigo-200">Your tech partner</p>
+            </div>
+            <div className="space-y-4">
+              <h4 className="font-mono">Quick Links</h4>
+              <ul className="space-y-2 text-indigo-200 font-mono">
+                <li>About Us</li>
+                <li>Contact</li>
+                <li>Support</li>
+                <li>Terms</li>
+              </ul>
+            </div>
+            <div className="space-y-4">
+              <h4 className="font-mono">Categories</h4>
+              <ul className="space-y-2 text-indigo-200 font-mono">
+                <li>Smartphones</li>
+                <li>Laptops</li>
+                <li>Audio</li>
+                <li>Accessories</li>
+              </ul>
+            </div>
+            <div className="space-y-4">
+              <h4 className="font-mono">Newsletter</h4>
+              <p className="text-indigo-200 font-mono">Stay updated with our latest offers</p>
+              <Button className="w-full bg-white text-indigo-900 hover:bg-indigo-100 rounded-none font-mono">
+                Subscribe
+              </Button>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };
 
-export default Home;
+export default LandingPage;
