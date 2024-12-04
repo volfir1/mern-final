@@ -135,13 +135,24 @@ export const useOrderApi = () => {
       throw error;
     }
   };
+  const cancelOrder = async (orderId) => {
+    try {
+      const response = await api.patch(`/orders/${orderId}/status`, {
+        orderStatus: 'CANCELLED'
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  };
   return {
     getAllOrders,
     getUserOrders,
     getOrderById,
     updateOrderStatus,
     createOrder,
-    createReview
+    createReview,
+    cancelOrder
   };
 };
 

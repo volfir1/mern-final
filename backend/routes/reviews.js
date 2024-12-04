@@ -1,3 +1,5 @@
+// routes/reviews.js
+
 import express from 'express'; 
 import reviewController from '../controllers/reviews.js'; 
 import { protect, authorize } from '../middleware/auth.js';  
@@ -28,4 +30,4 @@ router.route('/:reviewId')
   .put(reviewController.updateReview)   
   .delete(authorize('admin'), reviewController.deleteReview);  
 
-export default router;
+export default router; 

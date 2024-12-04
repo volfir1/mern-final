@@ -1,3 +1,5 @@
+// src/components/ReviewModal.jsx
+
 import React, { useState } from 'react';
 import { Formik, Form } from 'formik';
 import * as Yup from 'yup';
@@ -27,9 +29,10 @@ const reviewValidationSchema = Yup.object().shape({
 });
 
 const ReviewModal = ({ open, onClose, product, onSubmit, submitting }) => {
-  // Add error state
+  // State to handle backend errors
   const [error, setError] = useState(null);
 
+  // Initial form values
   const initialValues = {
     rating: product?.userReview?.rating || 0,
     comment: product?.userReview?.comment || '',
@@ -42,13 +45,13 @@ const ReviewModal = ({ open, onClose, product, onSubmit, submitting }) => {
 
   const handleSubmit = async (values, { setSubmitting }) => {
     try {
-      setError(null); // Reset error state before submitting
-      await onSubmit(values); // Submit review
-      onClose(); // Close the modal after successful submission
+      setError(null); // Reset error state before submission
+      await onSubmit(values); // Submit the review
+      onClose(); // Close the modal upon successful submission
     } catch (err) {
-      setError(err.message); // Set error message if submission fails
+      setError(err.message); // Display error message from backend
     } finally {
-      setSubmitting(false); // Stop submitting state
+      setSubmitting(false); // End the submitting state
     }
   };
 
@@ -75,14 +78,14 @@ const ReviewModal = ({ open, onClose, product, onSubmit, submitting }) => {
           <Form>
             <DialogContent>
               <Box className="space-y-6">
-                {/* Display Error */}
+                {/* Display Backend Error */}
                 {error && (
                   <Alert severity="error" className="mx-4 mt-4">
                     {error}
                   </Alert>
                 )}
 
-                {/* Product Info */}
+                {/* Product Information */}
                 <Box className="flex items-center gap-4">
                   <img
                     src={product?.images?.[0] || '/placeholder.jpg'}
@@ -92,7 +95,7 @@ const ReviewModal = ({ open, onClose, product, onSubmit, submitting }) => {
                   <Typography variant="h6">{product?.name}</Typography>
                 </Box>
 
-                {/* Rating */}
+                {/* Rating Field */}
                 <Box className="space-y-2">
                   <Typography component="legend">Rating</Typography>
                   <Rating
@@ -109,7 +112,7 @@ const ReviewModal = ({ open, onClose, product, onSubmit, submitting }) => {
                   )}
                 </Box>
 
-                {/* Comment */}
+                {/* Comment Field */}
                 <TextField
                   fullWidth
                   multiline

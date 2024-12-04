@@ -1,4 +1,5 @@
 // app.js
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -27,6 +28,12 @@ import reviewRoutes from './routes/reviews.js';
 // Import middleware
 import { protect, securityHeaders } from './middleware/auth.js';
 import { handleWebhook } from './controllers/payment.js';
+
+// Import models to ensure they are registered
+import './models/userAuth.js';      // Registers "User"
+import './models/product.js';   // Registers "Product"
+import './models/reviews.js';    // Registers "Review"
+// Import other models as necessary
 
 const router = express.Router();
 

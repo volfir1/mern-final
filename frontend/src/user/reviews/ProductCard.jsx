@@ -1,22 +1,16 @@
+// src/components/ProductCard.jsx
+
 import React, { useMemo } from 'react';
+import { Card, CardMedia, CardContent, Typography, Button, Box, Rating, Skeleton } from '@mui/material';
 import PropTypes from 'prop-types';
-import { 
-  Card, 
-  CardMedia,
-  CardContent,
-  Typography, 
-  Button, 
-  Box, 
-  Rating,
-  Skeleton 
-} from '@mui/material';
-import { Edit, Star } from 'lucide-react';
+import { Edit, Star } from '@mui/icons-material';
 
 const ProductCard = ({ 
   product, 
   onReview, 
   isReviewed, 
-  loading = false // Using default parameter instead of defaultProps
+  submitting = false, // Default parameter
+  loading = false 
 }) => {
   // Return loading skeleton if loading
   if (loading) {
@@ -111,8 +105,9 @@ const ProductCard = ({
                 fullWidth
                 startIcon={<Edit size={16} />}
                 className="mt-2"
+                disabled={submitting} // Disable while submitting
               >
-                Edit Review
+                {submitting ? 'Updating...' : 'Edit Review'}
               </Button>
             </>
           ) : (
@@ -122,8 +117,9 @@ const ProductCard = ({
               onClick={() => onReview(product)}
               fullWidth
               className="mt-2"
+              disabled={submitting} // Disable while submitting
             >
-              Write Review
+              {submitting ? 'Submitting...' : 'Write Review'}
             </Button>
           )}
         </Box>
@@ -134,21 +130,20 @@ const ProductCard = ({
 
 ProductCard.propTypes = {
   product: PropTypes.shape({
+    productId: PropTypes.string.isRequired,
     name: PropTypes.string.isRequired,
-    images: PropTypes.arrayOf(PropTypes.oneOfType([
-      PropTypes.string,
-      PropTypes.shape({
-        url: PropTypes.string
-      })
-    ])),
+    images: PropTypes.arrayOf(PropTypes.string),
+    orderId: PropTypes.string.isRequired,
     userReview: PropTypes.shape({
+      _id: PropTypes.string,
       rating: PropTypes.number,
       comment: PropTypes.string
     })
-  }),
+  }).isRequired,
   onReview: PropTypes.func.isRequired,
   isReviewed: PropTypes.bool.isRequired,
+  submitting: PropTypes.bool,
   loading: PropTypes.bool
 };
 
-export default React.memo(ProductCard);
+export default ProductCard;

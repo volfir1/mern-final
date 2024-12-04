@@ -1,107 +1,74 @@
+// 1. Update models/review.js
 import mongoose from 'mongoose';
+import './userAuth.js';  // Import UserAuth model
 
 const reviewSchema = new mongoose.Schema({
-  version: { type: Number, default: 1 },
   user: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'UserAuth',
-    required: [true, 'User is required']
+    ref: 'UserAuth',  // Change to UserAuth
+    required: true
   },
   product: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product',
-    required: [true, 'Product is required']
+    required: true
   },
   order: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Order',
-    required: [true, 'Order is required']
+    required: true
   },
   rating: {
     type: Number,
-    required: [true, 'Rating is required'],
-    min: [1, 'Rating must be at least 1'],
-    max: [5, 'Rating cannot exceed 5']
+    required: true,
+    min: 1,
+    max: 5
   },
   comment: {
     type: String,
-    required: [true, 'Review comment is required'],
     trim: true,
-    maxlength: [500, 'Comment cannot exceed 500 characters']
+    maxlength: 500
   },
-  isEdited: {
-    type: Boolean,
-    default: false
+  version: {
+    type: Number,
+    default: 1
   },
   editHistory: [{
     rating: Number,
     comment: String,
-    editedAt: Date
+    editedAt: {
+      type: Date,
+      default: Date.now
+    }
   }]
 }, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
+  timestamps: true
 });
 
-// Compound index to ensure one review per user per product
 reviewSchema.index({ user: 1, product: 1, order: 1 }, { unique: true });
 
-// Update product's average rating when review is added/modified
-reviewSchema.post('save', async function() {
-  const productId = this.product;
-  const Product = mongoose.model('Product');
-  
-  const stats = await this.constructor.aggregate([
-    { $match: { product: productId } },
-    {
-      $group: {
-        _id: '$product',
-        avgRating: { $avg: '$rating' },
-        ratingCount: { $sum: 1 }
-      }
+// 2. Add a pre-find middleware to populate user profile
+reviewSchema.pre('find', function() {
+  this.populate({
+    path: 'user',
+    select: 'displayName photoURL email',
+    populate: {
+      path: 'profile',
+      select: 'firstName lastName'
     }
-  ]);
-
-  await Product.findByIdAndUpdate(productId, {
-    'metadata.rating': stats[0]?.avgRating || 0,
-    'metadata.ratingCount': stats[0]?.ratingCount || 0
   });
 });
 
-// Instance methods
-reviewSchema.methods = {
-  async updateReview(rating, comment) {
-    // Store current review in edit history
-    this.editHistory.push({
-      rating: this.rating,
-      comment: this.comment,
-      editedAt: new Date()
-    });
-
-    // Update review
-    this.rating = rating;
-    this.comment = comment;
-    this.isEdited = true;
-
-    return this.save();
-  }
-};
-
-// Static methods
-reviewSchema.statics = {
-  async getProductReviews(productId) {
-    return this.find({ product: productId })
-      .populate('user', 'displayName photoURL')
-      .sort('-createdAt');
-  },
-
-  async getUserReviews(userId) {
-    return this.find({ user: userId })
-      .populate('product', 'name images')
-      .sort('-createdAt');
-  }
-};
-
+reviewSchema.pre(/^find/, function() {  // Change to catch all find operations
+  this.populate({
+    path: 'user',
+    select: 'displayName photoURL email',
+    populate: {
+      path: 'profile',
+      select: 'firstName lastName'
+    }
+  })
+  .populate('order', 'orderNumber');  // Add order population
+});
 const Review = mongoose.model('Review', reviewSchema);
 export default Review;

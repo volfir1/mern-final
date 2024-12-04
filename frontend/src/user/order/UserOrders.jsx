@@ -1,8 +1,20 @@
+// UserOrders.jsx
+
 import React, { useState, useEffect } from 'react';
-import { ArrowBack } from '@mui/icons-material';
-import { Button } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
 import {
+  ArrowBack,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  LocalShipping as ShippingIcon,
+  Payment as PaymentIcon,
+  Schedule as PendingIcon,
+  CheckCircle as DeliveredIcon,
+  Cancel as CancelledIcon,
+  Receipt as OrderIcon,
+  Close as CloseIcon
+} from '@mui/icons-material';
+import {
+  Button,
   Box,
   Typography,
   CircularProgress,
@@ -17,21 +29,18 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TablePagination
+  TablePagination,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle
 } from '@mui/material';
-import {
-  KeyboardArrowDown as ExpandMoreIcon,
-  KeyboardArrowUp as ExpandLessIcon,
-  LocalShipping as ShippingIcon,
-  Payment as PaymentIcon,
-  Schedule as PendingIcon,
-  CheckCircle as DeliveredIcon,
-  Cancel as CancelledIcon,
-  Receipt as OrderIcon
-} from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import api from '@/utils/api';
+import { toast } from 'react-toastify';
+import useOrderApi from '@/api/orderApi'; // Ensure this hook is correctly implemented
 
+// **OrderStatusChip Component**
 const OrderStatusChip = ({ status }) => {
   const getStatusColor = (status) => {
     switch (status) {
@@ -75,6 +84,7 @@ const OrderStatusChip = ({ status }) => {
   );
 };
 
+// **OrderItem Component**
 const OrderItem = ({ item }) => (
   <Box className="flex items-center gap-4 p-4 border-b last:border-b-0">
     <img
@@ -96,6 +106,7 @@ const OrderItem = ({ item }) => (
   </Box>
 );
 
+// **Main UserOrders Component**
 const UserOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -105,36 +116,130 @@ const UserOrders = () => {
   const navigate = useNavigate();
   const [rowsPerPage, setRowsPerPage] = useState(5);
 
+  // **States for Order Cancellation**
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
+  const orderApi = useOrderApi();
+
   useEffect(() => {
     fetchOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // **Fetch Orders from Backend**
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/orders');
-      if (response.data.success) {
-        setOrders(response.data.data);
+      const response = await orderApi.getUserOrders(); // Assuming this fetches current user's orders
+      if (response.success) {
+        setOrders(response.data);
       } else {
-        throw new Error(response.data.message);
+        throw new Error(response.message || 'Failed to fetch orders');
       }
     } catch (error) {
       console.error('Error fetching orders:', error);
-      setError(error.message || 'Failed to fetch orders');
+      setError(error.response?.data?.message || error.message || 'Failed to fetch orders');
     } finally {
       setLoading(false);
     }
   };
 
+  // **Handle Page Change for Pagination**
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
   };
 
+  // **Handle Rows Per Page Change for Pagination**
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
+  // **Cancel Order Handler**
+  const handleCancelOrder = async () => {
+    if (!selectedOrder) return;
+
+    try {
+      setCancelling(true);
+      const response = await orderApi.cancelOrder(selectedOrder._id);
+
+      if (response.success) {
+        // Update order status locally
+        setOrders(orders.map(order => 
+          order._id === selectedOrder._id 
+            ? { ...order, orderStatus: 'CANCELLED' }
+            : order
+        ));
+        toast.success('Order cancelled successfully');
+      } else {
+        throw new Error(response.message || 'Failed to cancel order');
+      }
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      toast.error(error.message || 'Failed to cancel order');
+    } finally {
+      setCancelling(false);
+      setCancelDialogOpen(false);
+      setSelectedOrder(null);
+    }
+  };
+
+  // **CancelOrderDialog Component**
+  const CancelOrderDialog = () => (
+    <Dialog 
+      open={cancelDialogOpen} 
+      onClose={() => !cancelling && setCancelDialogOpen(false)}
+      maxWidth="sm"
+      fullWidth
+    >
+      <DialogTitle>
+        Cancel Order
+        {!cancelling && (
+          <IconButton
+            aria-label="close"
+            onClick={() => setCancelDialogOpen(false)}
+            sx={{ position: 'absolute', right: 8, top: 8 }}
+          >
+            <CloseIcon />
+          </IconButton>
+        )}
+      </DialogTitle>
+      <DialogContent>
+        <Typography variant="body1" sx={{ mb: 2 }}>
+          Are you sure you want to cancel order #{selectedOrder?.orderNumber}?
+        </Typography>
+        <Typography color="warning.main" variant="body2">
+          This action cannot be undone.
+        </Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button 
+          onClick={() => setCancelDialogOpen(false)} 
+          disabled={cancelling}
+          color="inherit"
+        >
+          Keep Order
+        </Button>
+        <Button
+          onClick={handleCancelOrder}
+          color="error"
+          variant="contained"
+          disabled={cancelling}
+          startIcon={cancelling ? <CircularProgress size={20} /> : <CancelledIcon />}
+        >
+          {cancelling ? 'Cancelling...' : 'Yes, Cancel Order'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+
+  // **Handle Order Row Click to Expand/Collapse**
+  const toggleExpandOrder = (orderId) => {
+    setExpandedOrder(expandedOrder === orderId ? null : orderId);
+  };
+
+  // **Loading State**
   if (loading) {
     return (
       <Box className="flex justify-center items-center min-h-[400px]">
@@ -143,6 +248,7 @@ const UserOrders = () => {
     );
   }
 
+  // **Error State**
   if (error) {
     return (
       <Alert severity="error" className="m-4">
@@ -151,6 +257,7 @@ const UserOrders = () => {
     );
   }
 
+  // **No Orders Found**
   if (!orders.length) {
     return (
       <Paper className="p-8 text-center">
@@ -167,6 +274,7 @@ const UserOrders = () => {
 
   return (
     <Box className="container mx-auto px-4 py-8">
+      {/* **Header Section** */}
       <Box className="flex justify-between items-center mb-6">
         <Typography variant="h4" component="h1" className="font-bold">
           Your Orders
@@ -182,6 +290,7 @@ const UserOrders = () => {
         </Button>
       </Box>
   
+      {/* **Orders Table** */}
       <TableContainer 
         component={Paper} 
         className="mb-4 shadow-md rounded-lg overflow-hidden"
@@ -195,6 +304,7 @@ const UserOrders = () => {
               <TableCell className="font-medium">Total</TableCell>
               <TableCell className="font-medium">Status</TableCell>
               <TableCell className="font-medium">Payment</TableCell>
+              {/* Removed "Actions" Column to simplify */}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -202,10 +312,11 @@ const UserOrders = () => {
               .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
               .map((order) => (
                 <React.Fragment key={order._id}>
+                  {/* **Order Row** */}
                   <TableRow 
                     hover 
                     className="transition-colors cursor-pointer"
-                    onClick={() => setExpandedOrder(expandedOrder === order._id ? null : order._id)}
+                    onClick={() => toggleExpandOrder(order._id)}
                   >
                     <TableCell>
                       <IconButton size="small">
@@ -223,8 +334,27 @@ const UserOrders = () => {
                     <TableCell className="font-medium text-gray-900">
                       ₱{order.total.toFixed(2)}
                     </TableCell>
+                    {/* **Status Column with Cancel Order Button** */}
                     <TableCell>
-                      <OrderStatusChip status={order.orderStatus} />
+                      <Box display="flex" alignItems="center" gap={2}>
+                        <OrderStatusChip status={order.orderStatus} />
+                        {order.orderStatus === 'PENDING' && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            startIcon={<CancelledIcon />}
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent row expansion
+                              setSelectedOrder(order);
+                              setCancelDialogOpen(true);
+                            }}
+                            aria-label={`Cancel order ${order.orderNumber}`}
+                          >
+                            Cancel Order
+                          </Button>
+                        )}
+                      </Box>
                     </TableCell>
                     <TableCell>
                       <Chip
@@ -237,6 +367,8 @@ const UserOrders = () => {
                       />
                     </TableCell>
                   </TableRow>
+  
+                  {/* **Expanded Order Details** */}
                   <TableRow>
                     <TableCell className="p-0" colSpan={6}>
                       <Collapse in={expandedOrder === order._id} timeout="auto" unmountOnExit>
@@ -250,6 +382,7 @@ const UserOrders = () => {
                             ))}
                           </Paper>
                           <Box className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* **Shipping Address Section** */}
                             <Box className="space-y-3">
                               <Typography variant="subtitle2" className="font-bold text-gray-900">
                                 Shipping Address
@@ -262,6 +395,7 @@ const UserOrders = () => {
                                 </Typography>
                               </Paper>
                             </Box>
+                            {/* **Order Summary Section** */}
                             <Box className="space-y-3">
                               <Typography variant="subtitle2" className="font-bold text-gray-900">
                                 Order Summary
@@ -292,6 +426,7 @@ const UserOrders = () => {
         </Table>
       </TableContainer>
   
+      {/* **Pagination Controls** */}
       <TablePagination
         component={Paper}
         count={orders.length}
@@ -302,6 +437,9 @@ const UserOrders = () => {
         rowsPerPageOptions={[5, 10, 25]}
         className="shadow-sm"
       />
+  
+      {/* **Cancel Order Confirmation Dialog** */}
+      <CancelOrderDialog />
     </Box>
   );
 }; // Close UserOrders component

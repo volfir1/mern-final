@@ -8,7 +8,9 @@ const API_ENDPOINTS = {
   product: (id) => `/products/${id}`,
   checkName: '/products/check-name',
   images: '/upload',
-   search: '/products/search'
+   search: '/products/search',
+   reviews: (productId) => `/reviews/product/${productId}` // Add this
+
 };
 
 // Cloudinary configuration (reuse from category)
@@ -243,6 +245,28 @@ export const searchProducts = async (query) => {
     throw error;
   }
 };
+
+export const getProductReviews = async (productId) => {
+  try {
+    if (!productId) throw new Error('Product ID is required');
+    
+    const token = await getAuthToken();
+    console.log('Fetching reviews with token:', !!token);
+    
+    const response = await api.get(`/reviews/product/${productId}`, {
+      headers: { 
+        Authorization: `Bearer ${token}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    // Return the data array directly
+    return response.data;
+  } catch (error) {
+    console.error('Get product reviews error:', error);
+    throw error;
+  }
+};
 // Export both ways for consistency
 export const productApi = {
   getAllProducts,
@@ -251,7 +275,8 @@ export const productApi = {
   updateProduct,
   deleteProduct,
   checkProductName,
-  searchProducts
+  searchProducts,
+  getProductReviews
 };
 
 export default productApi;

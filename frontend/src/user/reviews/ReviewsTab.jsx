@@ -1,3 +1,5 @@
+// src/components/ReviewsTab.jsx
+
 import React, { useState } from 'react';
 import {
   Box,
@@ -19,6 +21,7 @@ import { ArrowBack } from '@mui/icons-material';
 // OrderGroup Component Definition
 const OrderGroup = ({ order, products, onReview, isReviewed }) => (
   <Box className="mb-8 bg-white rounded-lg shadow-sm p-4">
+    {/* Order Header */}
     <Box className="flex items-center justify-between mb-4">
       <Box>
         <Typography variant="h6" className="font-medium">
@@ -33,6 +36,7 @@ const OrderGroup = ({ order, products, onReview, isReviewed }) => (
       </Typography>
     </Box>
     
+    {/* Products Grid */}
     <Grid container spacing={3}>
       {products.map((product) => (
         <Grid item xs={12} sm={6} md={4} key={`${order._id}_${product.productId}`}>
@@ -74,6 +78,7 @@ const ReviewsTab = ({ orders = [], onSubmitReview, submitting = false, loading =
   const [modalOpen, setModalOpen] = useState(false);
   const navigate = useNavigate();
 
+  // Process orders to extract relevant product information
   const deliveredOrders = orders
     .filter(order => order.orderStatus === 'DELIVERED')
     .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
@@ -100,6 +105,7 @@ const ReviewsTab = ({ orders = [], onSubmitReview, submitting = false, loading =
         })
     }));
 
+  // Handler for clicking the "Write Review" or "Edit Review" button
   const handleReviewClick = (product) => {
     setSelectedProduct({
       ...product,
@@ -108,11 +114,13 @@ const ReviewsTab = ({ orders = [], onSubmitReview, submitting = false, loading =
     setModalOpen(true);
   };
 
+  // Handler to close the ReviewModal
   const handleCloseModal = () => {
     setModalOpen(false);
     setSelectedProduct(null);
   };
 
+  // Handler for submitting a review
   const handleSubmitReview = async (reviewData) => {
     try {
       console.log('Submitting review:', {
@@ -130,8 +138,8 @@ const ReviewsTab = ({ orders = [], onSubmitReview, submitting = false, loading =
       console.log('Review submitted successfully');
       handleCloseModal();
       
-      // Instead of window.location.reload(), let's refetch the orders
-      await fetchOrders();
+      // Since orders are passed as props, ensure that the parent component refreshes them after submission
+      // Alternatively, you can manage orders within this component using state and fetch them here
     } catch (error) {
       console.error('Review submission failed:', {
         error: error.message,
@@ -140,47 +148,28 @@ const ReviewsTab = ({ orders = [], onSubmitReview, submitting = false, loading =
           orderId: selectedProduct.orderId
         }
       });
-      throw error;
+      throw error; // This allows ReviewModal to handle and display the error
     }
   };
   console.log('Sample order item with review:', orders[0]?.items[0]);
 
 
+  // Function to filter products based on the active tab
   const filterProducts = (products, isReviewed) => {
-    console.log('Filtering products:', {
-        totalProducts: products.length,
-        isReviewed,
-        productsDetails: products.map(p => ({
-            id: p.productId,
-            name: p.name,
-            hasReview: !!p.userReview,
-            reviewData: p.userReview ? {
-                rating: p.userReview.rating,
-                comment: p.userReview.comment
-            } : null
-        }))
-    });
-
-    const filteredProducts = products.filter(product => {
+    return products.filter(product => {
         const hasReview = !!product.userReview;
         return isReviewed === hasReview;
     });
+  };
 
-    console.log('Filtered results:', {
-        isReviewed,
-        filteredCount: filteredProducts.length,
-        filteredProducts: filteredProducts.map(p => p.name)
-    });
-
-    return filteredProducts;
-};
-
+  // Calculate counts for tabs
   const toReviewCount = deliveredOrders.reduce((count, order) => 
     count + filterProducts(order.products, false).length, 0);
   
   const reviewedCount = deliveredOrders.reduce((count, order) => 
     count + filterProducts(order.products, true).length, 0);
 
+  // Loading State
   if (loading) {
     return (
       <Box className="flex justify-center items-center py-12">
@@ -189,6 +178,7 @@ const ReviewsTab = ({ orders = [], onSubmitReview, submitting = false, loading =
     );
   }
 
+  // Error State
   if (error) {
     return (
       <Alert severity="error" className="my-4">
@@ -197,6 +187,7 @@ const ReviewsTab = ({ orders = [], onSubmitReview, submitting = false, loading =
     );
   }
 
+  // No Orders Available
   if (!deliveredOrders.length) {
     return (
       <Box className="text-center py-12">
@@ -212,6 +203,7 @@ const ReviewsTab = ({ orders = [], onSubmitReview, submitting = false, loading =
 
   return (
     <Box>
+      {/* Back to Products Button */}
       <Button
         variant="outlined"
         color="primary"
@@ -222,6 +214,7 @@ const ReviewsTab = ({ orders = [], onSubmitReview, submitting = false, loading =
         Back to Products
       </Button>
 
+      {/* Tabs for "To Review" and "Reviewed" */}
       <Tabs
         value={activeTab}
         onChange={(_, newValue) => setActiveTab(newValue)}
@@ -231,6 +224,7 @@ const ReviewsTab = ({ orders = [], onSubmitReview, submitting = false, loading =
         <Tab label={`Reviewed (${reviewedCount})`} />
       </Tabs>
 
+      {/* Render Order Groups based on the active tab */}
       {deliveredOrders.map(order => {
         const orderProducts = filterProducts(order.products, activeTab === 1);
 
@@ -247,6 +241,7 @@ const ReviewsTab = ({ orders = [], onSubmitReview, submitting = false, loading =
         );
       })}
 
+      {/* Review Modal */}
       <ReviewModal
         open={modalOpen}
         onClose={handleCloseModal}
@@ -274,7 +269,7 @@ ReviewsTab.propTypes = {
         PropTypes.string,
         PropTypes.shape({
           _id: PropTypes.string.isRequired,
-          rating: PropTypes.number,
+          rating: PropTypes.number.isRequired,
           comment: PropTypes.string
         })
       ])
