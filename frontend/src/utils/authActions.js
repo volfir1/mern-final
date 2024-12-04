@@ -211,34 +211,44 @@ export const login = async (credentials, setStates) => {
     try {
       setLoading(true);
   
+      // Get Firebase auth result
       const result = await signInWithPopup(auth, googleProvider);
-      const token = await result.user.getIdToken();
+      const idToken = await result.user.getIdToken();
   
-      const response = await api.post("/auth/google-login", null, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // Make API call with credential
+      const response = await api.post("/auth/google-login", 
+        { credential: idToken },
+        { 
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
   
-      if (!response.data?.user) {
-        throw new Error("Google authentication failed");
+      if (response?.data?.success && response?.data?.user) {
+        // Save tokens from backend response
+        await TokenManager.setToken(response.data.tokens.accessToken);
+        await TokenManager.setUser(response.data.user);
+  
+        // Navigate based on role
+        const redirectPath = response.data.user.role === "admin" 
+          ? "/admin/dashboard" 
+          : "/user/dashboard";
+        
+        navigate(redirectPath, { replace: true });
+        return response.data;
+      } else {
+        throw new Error(response?.data?.message || "Google authentication failed");
       }
-  
-      // Update user data
-      await TokenManager.setToken(token);
-      await TokenManager.setUser(response.data.user);
-  
-      const redirectPath = response.data.user.role === "admin" ? "/admin/dashboard" : "/user/dashboard";
-      navigate(redirectPath, { replace: true });
-  
-      return response.data;
     } catch (error) {
-      const errorMessage = error.message || "Google login failed";
+      console.error('Google login error:', error);
+      const errorMessage = error.response?.data?.message || error.message;
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
-  
   
   // Logout
   export const logout = async (navigate) => {

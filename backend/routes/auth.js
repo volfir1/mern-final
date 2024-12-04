@@ -213,7 +213,7 @@ router.post('/login', async (req, res) => {
       const decodedToken = await admin.auth().verifyIdToken(firebaseToken);
       
       // Get or create user in your database
-      const user = await User.findOne({ email: email.toLowerCase() });
+      const user = await UserAuth.findOne({ email: email.toLowerCase() });
       
       if (!user) {
         return res.status(404).json({

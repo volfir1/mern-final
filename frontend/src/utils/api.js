@@ -50,6 +50,20 @@ api.interceptors.request.use(
 // Response interceptor with comprehensive error handling
 api.interceptors.response.use(
   (response) => {
+    // Validate response data
+    if (response.data === "null" || response.data === null) {
+      return response; // Don't throw error, just return response
+    }
+
+    try {
+      // If data is string, try to parse it
+      if (typeof response.data === 'string') {
+        response.data = JSON.parse(response.data);
+      }
+    } catch (e) {
+      console.warn('Response data parsing failed:', e);
+    }
+
     if (import.meta.env.DEV) {
       console.log('API Response:', {
         url: response.config.url,
@@ -61,24 +75,52 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
-    console.error('API Error:', {
+    const errorDetails = {
       url: error.config?.url,
       method: error.config?.method,
       status: error.response?.status,
       data: error.response?.data,
       message: error.message,
       timestamp: new Date().toISOString()
-    });
+    };
+    console.error('API Error:', errorDetails);
 
+    // Handle different error types
     if (!error.response) {
-      throw new Error(`Network error: ${error.message}`);
+      throw new Error('Network error: Please check your connection');
     }
 
-    const errorMessage = error.response?.data?.message || error.message;
+    let errorMessage;
+    try {
+      if (error.response.status === 400) {
+        // Handle null response
+        if (error.response.data === "null" || error.response.data === null) {
+          errorMessage = "Authentication failed: Invalid response from server";
+        }
+        // Handle string response
+        else if (typeof error.response.data === 'string') {
+          try {
+            const parsed = JSON.parse(error.response.data);
+            errorMessage = parsed.message || "Authentication failed";
+          } catch (e) {
+            errorMessage = error.response.data || "Authentication failed";
+          }
+        }
+        // Handle object response
+        else {
+          errorMessage = error.response.data?.message || "Authentication failed";
+        }
+      } else {
+        errorMessage = error.response.data?.message || error.message;
+      }
+    } catch (e) {
+      errorMessage = "An unexpected error occurred";
+      console.error('Error parsing error response:', e);
+    }
+
     throw new Error(errorMessage);
   }
 );
-
 // Add request/response timing in development
 if (import.meta.env.DEV) {
   api.interceptors.request.use((config) => {

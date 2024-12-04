@@ -518,6 +518,15 @@ export const googleLoginHandler = async (req, res) => {
   try {
     const { credential } = req.body;
 
+    // Validate environment variables
+    if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_SECRET) {
+      console.error('Missing JWT environment variables');
+      return res.status(500).json({
+        success: false,
+        message: 'Server configuration error'
+      });
+    }
+
     if (!credential) {
       return res.status(400).json({
         success: false,
@@ -526,37 +535,39 @@ export const googleLoginHandler = async (req, res) => {
     }
 
     try {
+      // Verify token
       const decodedToken = await auth.verifyIdToken(credential);
-      const { email, name, picture } = decodedToken;
+      const { email, name, picture, email_verified = true } = decodedToken;
 
+      // Get or create Firebase user
       let userRecord;
       try {
         userRecord = await auth.getUserByEmail(email);
       } catch (error) {
+        // Create new user if doesn't exist
         userRecord = await auth.createUser({
           email,
           displayName: name,
           photoURL: picture,
-          emailVerified: true
+          emailVerified: email_verified
         });
       }
 
+      // Get or create MongoDB user
       let mongoUser = await UserAuth.findOne({ email: email.toLowerCase() });
-      
       if (!mongoUser) {
         mongoUser = await UserAuth.create({
           email: email.toLowerCase(),
-          firebaseUid: decodedToken.uid,
+          firebaseUid: userRecord.uid,
           provider: 'google',
           role: 'user',
           isEmailVerified: email_verified,
-          firstName,
-          lastName,
-          displayName: name, // Optional for Firebase compatibility
-          photoURL: picture,
+          displayName: name,
+          photoURL: picture
         });
       }
 
+      // Generate tokens
       const accessToken = jwt.sign(
         {
           uid: userRecord.uid,
@@ -564,35 +575,37 @@ export const googleLoginHandler = async (req, res) => {
           role: mongoUser.role
         },
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN }
+        { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
       );
 
       const refreshToken = jwt.sign(
         { uid: userRecord.uid },
         process.env.JWT_REFRESH_SECRET,
-        { expiresIn: '7d' }
+        { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
       );
 
-      await UserAuth.findByIdAndUpdate(mongoUser._id, {
+      // Update user's refresh token
+      await mongoUser.updateOne({
         refreshToken,
         lastLogin: new Date()
       });
 
+      // Set cookies
       res.cookie('accessToken', accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
       });
 
       res.cookie('refreshToken', refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
       });
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         message: 'Google login successful',
         user: {
@@ -600,13 +613,17 @@ export const googleLoginHandler = async (req, res) => {
           email: userRecord.email,
           displayName: name,
           role: mongoUser.role,
-          isEmailVerified: true,
+          isEmailVerified: email_verified,
           photoURL: picture
+        },
+        tokens: {
+          accessToken,
+          refreshToken
         }
       });
 
     } catch (error) {
-      console.error('Google login error:', error);
+      console.error('Token verification error:', error);
       return res.status(401).json({
         success: false,
         message: 'Invalid Google credentials'
@@ -614,7 +631,7 @@ export const googleLoginHandler = async (req, res) => {
     }
   } catch (error) {
     console.error('Server error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Internal server error'
     });

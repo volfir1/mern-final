@@ -118,14 +118,31 @@ const Login = () => {
   // Handle Google Sign In
   const handleGoogleLogin = async () => {
     try {
+      setLoading(true);
       setAuthError(null);
-      await googleLogin();
+  
+      // Add timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Login timeout')), 15000);
+      });
+  
+      // Race between login and timeout
+      await Promise.race([
+        googleLogin(),
+        timeoutPromise
+      ]);
+  
     } catch (error) {
       console.error('Google login error:', error);
-      setAuthError(error.message || 'Failed to sign in with Google');
+      setAuthError(
+        error.message === 'Login timeout' 
+          ? 'Login timed out. Please try again.'
+          : error.message || 'Failed to sign in with Google'
+      );
+    } finally {
+      setLoading(false);
     }
   };
-
   // Handle lockout timer
   useEffect(() => {
     let interval;
