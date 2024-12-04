@@ -60,12 +60,24 @@ export const useReviewApi = () => {
     }
   };
 
+  const getAllReviews = async () => {
+    try {
+      const response = await api.get('/reviews/all');
+      return response.data;
+    } catch (error) {
+      console.error('Get all reviews error:', error);
+      throw error;
+    }
+  };
+
+
   return {
     createReview,
     updateReview,
     deleteReview,
     getProductReviews,
-    getUserReviews
+    getUserReviews,
+    getAllReviews
   };
 };
 

@@ -297,6 +297,33 @@ class ReviewController {
       data: {}
     });
   });
+
+
+  getAllReviews = this.asyncWrapper(async (req, res) => {
+    try {
+      const reviews = await Review.find()
+        .populate({
+          path: 'user',
+          select: 'displayName email photoURL',
+          populate: {
+            path: 'profile',
+            select: 'firstName lastName'
+          }
+        })
+        .populate('product', 'name')
+        .populate('order', 'orderNumber')
+        .sort('-createdAt');
+
+      res.status(200).json({
+        success: true,
+        count: reviews.length,
+        data: reviews
+      });
+    } catch (error) {
+      console.error('Get all reviews error:', error);
+      throw error;
+    }
+  });
 }
 
 export default new ReviewController();

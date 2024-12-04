@@ -34,8 +34,8 @@ export const SidebarData = [
     link: "/admin/orders",
   },
   {
-    title: "Users",
+    title: "User Reviews",
     icon: <PeopleRoundedIcon />,
-    link: "/admin/users",
+    link: "/admin/reviews",
   },
 ];

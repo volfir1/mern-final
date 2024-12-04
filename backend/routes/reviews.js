@@ -17,6 +17,7 @@ router.use((req, res, next) => {
 });
 
 router.use(protect);  
+router.get('/all', authorize('admin'), reviewController.getAllReviews);
 
 router.route('/')   
   .post((req, res, next) => {
