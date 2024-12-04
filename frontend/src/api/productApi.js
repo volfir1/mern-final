@@ -71,47 +71,30 @@ export const getAllProducts = async (params = {}) => {
       inStock
     } = params;
 
-    console.log('Requesting products with params:', params);
-
-    // Construct query parameters
-    const queryParams = {
-      page,
-      limit,
-      sort,
-      order,
-      ...(search && { search }),
-      ...(minPrice && { minPrice }),
-      ...(maxPrice && { maxPrice }),
-      ...(category && { category }),
-      ...(inStock !== undefined && { inStock })
-    };
+    console.log('API Request params:', { page, limit, sort, order });
 
     const response = await api.get(API_ENDPOINTS.base, {
       headers: { Authorization: `Bearer ${token}` },
-      params: queryParams
-    });
-
-    // Validate response
-    if (!response?.data) {
-      throw new Error('Invalid API response format');
-    }
-
-    console.log('Products fetched successfully:', {
-      count: response.data.data?.length,
-      total: response.data.total,
-      pages: response.data.pages
+      params: {
+        page,
+        limit,
+        sort,
+        order,
+        ...(search && { search }),
+        ...(minPrice && { minPrice }),
+        ...(maxPrice && { maxPrice }),
+        ...(category && { category }),
+        ...(inStock !== undefined && { inStock })
+      }
     });
 
     return response;
   } catch (error) {
-    console.error('ProductApi error:', {
-      message: error.message,
-      status: error.response?.status,
-      data: error.response?.data
-    });
+    console.error('ProductApi error:', error);
     throw error;
   }
 };
+
 
 export const getProduct = async (id) => {
   try {

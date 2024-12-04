@@ -412,7 +412,7 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           <Link to="/" className="flex-shrink-0 flex items-center">
-            <span className="text-2xl font-bold text-blue-600">Brand</span>
+            <span className="text-2xl font-bold text-blue-600">Gadget Galaxy</span>
           </Link>
 
           <div className="hidden md:flex items-center space-x-4">

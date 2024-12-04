@@ -220,24 +220,76 @@ class ReviewController {
 
   // Get reviews for a specific product
   getProductReviews = this.asyncWrapper(async (req, res) => {
-    const { productId } = req.params;
-    console.log('Fetching reviews for product:', productId);
-    
-    const reviews = await Review.find({ product: productId })
-      .populate({
-        path: 'user',
-        select: 'displayName photoURL',
-        populate: {
-          path: 'profile',
-          select: 'firstName lastName'
-        }
-      })
-      .populate('order', 'orderNumber')
-      .sort('-createdAt');
+    try {
+      const { productId } = req.params;
   
-    console.log('Found reviews:', reviews);
+      // Validate productId
+      if (!productId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Product ID is required'
+        });
+      }
   
-    res.status(200).json(reviews);  // Send reviews directly
+      console.log('Fetching reviews for product:', productId);
+      
+      // Fetch reviews with populated user and order data
+      const reviews = await Review.find({ product: productId })
+        .populate({
+          path: 'user',
+          select: 'displayName email photoURL',
+          populate: {
+            path: 'profile',
+            select: 'firstName lastName'
+          }
+        })
+        .populate('order', 'orderNumber')
+        .sort('-createdAt');
+  
+      console.log('Found reviews:', reviews);
+  
+      // Format response with user details
+      const formattedReviews = reviews.map(review => ({
+        _id: review._id,
+        rating: review.rating,
+        comment: review.comment,
+        createdAt: review.createdAt,
+        updatedAt: review.updatedAt,
+        user: {
+          _id: review.user?._id,
+          displayName: review.user?.displayName || review.user?.email || 'Anonymous',
+          email: review.user?.email,
+          photoURL: review.user?.photoURL,
+          profile: review.user?.profile
+        },
+        order: {
+          _id: review.order?._id,
+          orderNumber: review.order?.orderNumber
+        },
+        product: review.product,
+        version: review.version,
+        editHistory: review.editHistory
+      }));
+  
+      return res.status(200).json({
+        success: true,
+        count: reviews.length,
+        data: formattedReviews
+      });
+  
+    } catch (error) {
+      console.error('Review Controller Error:', {
+        error: error.message,
+        stack: error.stack,
+        user: req.user?._id,
+        body: req.body
+      });
+  
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch reviews'
+      });
+    }
   });
 
   // Get user's own reviews

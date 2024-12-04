@@ -70,17 +70,17 @@ const ReviewCard = memo(({ review, onEdit }) => (
       <Box className="flex items-center gap-3">
         <Avatar
           src={review.user?.photoURL}
-          alt={review.user?.displayName}
+          alt={review.user?.displayName || review.user?.email}
           className="w-8 h-8 bg-indigo-100"
         >
-          {review.user?.displayName?.charAt(0) || "U"}
+          {(review.user?.displayName || review.user?.email)?.charAt(0) || "?"}
         </Avatar>
         <Box>
           <Typography
             variant="subtitle2"
             className="font-sans font-medium tracking-wide"
           >
-            {review.user?.displayName || "Anonymous"}
+            {review.user?.displayName || review.user?.email || "Anonymous"}
           </Typography>
           <Typography variant="caption" className="text-slate-600">
             Order #{review.order?.orderNumber} •{" "}
@@ -444,64 +444,41 @@ const ProductDisplay = () => {
   };
 
   // Fetch Products with improved pagination
-  const fetchProducts = useCallback(
-    async (params = {}) => {
-      try {
-        updateState({ loading: true, error: null });
+ const fetchProducts = useCallback(async (params = {}) => {
+  try {
+    updateState({ loading: true });
+    
+    const queryParams = {
+      page: (params.page ?? state.page) + 1,
+      limit: params.limit || state.rowsPerPage,
+      sort: params.sort || state.sortBy,
+      order: params.order || state.sortOrder,
+      search: state.searchTerm,
+      ...state.filters
+    };
 
-        // Fix pagination parameters
-        const queryParams = {
-          page: (params.page ?? state.page) + 1, // Convert to 1-based for API
-          limit: params.limit || state.rowsPerPage,
-          sort: state.sortBy,
-          order: state.sortOrder,
-          search: state.searchTerm,
-          ...state.filters,
-        };
+    console.log('Fetching with params:', queryParams);
+    
+    const response = await productApi.getAllProducts(queryParams);
 
-        console.log("Fetching products with params:", queryParams);
-
-        const response = await productApi.getAllProducts(queryParams);
-
-        if (response?.data?.success) {
-          const { data, total, pages } = response.data;
-
-          updateState({
-            products: Array.isArray(data) ? data : [],
-            totalProducts: total,
-            totalPages: pages,
-            page: params.page ?? state.page,
-            loading: false,
-            error: null,
-          });
-
-          // Fetch reviews for new products
-          if (Array.isArray(data)) {
-            data.forEach((product) => fetchReviews(product._id));
-          }
-        } else {
-          throw new Error("Invalid API response");
-        }
-      } catch (error) {
-        console.error("Fetch Products Error:", error);
-        updateState({
-          error: error.message || "Failed to load products",
-          products: [],
-          totalProducts: 0,
-          totalPages: 1,
-          loading: false,
-        });
-      }
-    },
-    [
-      state.rowsPerPage,
-      state.sortBy,
-      state.sortOrder,
-      state.searchTerm,
-      state.filters,
-      state.page,
-    ]
-  );
+    if (response?.data?.success) {
+      updateState({
+        products: response.data.data || [],
+        totalProducts: response.data.total || 0,
+        totalPages: response.data.pages || 1,
+        page: params.page ?? state.page,
+        loading: false,
+        error: null
+      });
+    }
+  } catch (error) {
+    console.error('Fetch error:', error);
+    updateState({
+      error: error.message,
+      loading: false
+    });
+  }
+}, [state.page, state.rowsPerPage, state.sortBy, state.sortOrder, state.searchTerm, state.filters]);
 
   // Fetch Reviews
   const fetchReviews = useCallback(async (productId) => {
@@ -572,11 +549,19 @@ const ProductDisplay = () => {
 
   // Other Handlers
   const handleSort = (event) => {
+    const newSortBy = event.target.value;
+    console.log('Sorting by:', newSortBy);
+    
     updateState({
-      sortBy: event.target.value,
-      page: 0,
+      sortBy: newSortBy,
+      page: 0
     });
-    fetchProducts({ page: 0 });
+  
+    fetchProducts({
+      page: 0,
+      sort: newSortBy,
+      order: state.sortOrder
+    });
   };
 
   const handleOpenReviews = useCallback(
@@ -716,14 +701,17 @@ const ProductDisplay = () => {
                         Sort By
                       </InputLabel>
                       <Select
-                        value={state.sortBy}
-                        onChange={handleSort}
-                        label="Sort By"
-                      >
-                        <MenuItem value="createdAt">Newest</MenuItem>
-                        <MenuItem value="price">Price</MenuItem>
-                        <MenuItem value="name">Name</MenuItem>
-                      </Select>
+  value={state.sortBy}
+  onChange={handleSort}
+  label="Sort By"
+>
+  <MenuItem value="createdAt">Newest First</MenuItem>
+  <MenuItem value="-createdAt">Oldest First</MenuItem>
+  <MenuItem value="price">Price: Low to High</MenuItem>
+  <MenuItem value="-price">Price: High to Low</MenuItem>
+  <MenuItem value="name">Name: A to Z</MenuItem>
+  <MenuItem value="-name">Name: Z to A</MenuItem>
+</Select>
                     </FormControl>
                   </Box>
                 </Grid>
