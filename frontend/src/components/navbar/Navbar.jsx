@@ -93,36 +93,27 @@ const Navbar = () => {
   };
 
   // Remove Item Handler
-  const handleRemoveItem = async (productId) => {
-    const cartItem = cart?.items?.find(item => {
-      const itemId = item.product?._id || item.product;
-      const searchId = productId?.toString().trim();
-      const itemProductId = itemId?.toString().trim();
-      return itemProductId === searchId;
-    });
-
-    if (!cartItem) {
-      toast.error('Item not found in cart');
-      return;
+// Fix handleRemoveItem in Navbar.jsx
+const handleRemoveItem = async (productId) => {
+  try {
+    setUpdatingItemId(productId);
+    
+    // Call the removeCartItem API directly
+    const response = await cartApi.removeFromCart(productId);
+    
+    if (response.success) {
+      setCart(response.data);
+      toast.success('Item removed from cart');
+    } else {
+      throw new Error(response.message || 'Failed to remove item');
     }
-
-    try {
-      setUpdatingItemId(productId);
-      const targetProductId = cartItem.product?._id || cartItem.product;
-      const response = await cartApi.removeCartItem(targetProductId.toString());
-      
-      if (response.success) {
-        setCart(response.data);
-        toast.success('Item removed from cart');
-      } else {
-        throw new Error(response.message || 'Failed to remove item');
-      }
-    } catch (error) {
-      toast.error(error.message || 'Failed to remove item');
-    } finally {
-      setUpdatingItemId(null);
-    }
-  };
+  } catch (error) {
+    console.error('Remove item error:', error);
+    toast.error(error.message || 'Failed to remove item');
+  } finally {
+    setUpdatingItemId(null);
+  }
+};
 
   // Search functionality
   const debouncedSearch = useMemo(

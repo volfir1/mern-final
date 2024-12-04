@@ -436,41 +436,42 @@ const ProductDisplay = () => {
   };
 
   // Fetch Products with improved pagination
- const fetchProducts = useCallback(async (params = {}) => {
-  try {
-    updateState({ loading: true });
-    
-    const queryParams = {
-      page: (params.page ?? state.page) + 1,
-      limit: params.limit || state.rowsPerPage,
-      sort: params.sort || state.sortBy,
-      order: params.order || state.sortOrder,
-      search: state.searchTerm,
-      ...state.filters
-    };
-
-    console.log('Fetching with params:', queryParams);
-    
-    const response = await productApi.getAllProducts(queryParams);
-
-    if (response?.data?.success) {
-      updateState({
-        products: response.data.data || [],
-        totalProducts: response.data.total || 0,
-        totalPages: response.data.pages || 1,
-        page: params.page ?? state.page,
-        loading: false,
-        error: null
-      });
+  const fetchProducts = useCallback(async (params = {}) => {
+    try {
+      updateState({ loading: true });
+      
+      const queryParams = {
+        page: (params.page ?? state.page) + 1,
+        limit: params.limit || state.rowsPerPage,
+        ...(params.search && { search: params.search }),
+        sort: params.sortBy || state.sortBy,
+        order: params.sortOrder || state.sortOrder,
+        ...state.filters
+      };
+  
+      console.log('Fetching products with params:', queryParams);
+      
+      const response = await productApi.getAllProducts(queryParams);
+  
+      if (response?.data?.success) {
+        updateState({
+          products: response.data.data || [],
+          totalProducts: response.data.total || 0,
+          totalPages: response.data.pages || 1,
+          loading: false,
+          error: null,
+          ...(params.page !== undefined && { page: params.page }),
+          ...(params.search !== undefined && { searchTerm: params.search }),
+          ...(params.sortBy !== undefined && { sortBy: params.sortBy }),
+          ...(params.sortOrder !== undefined && { sortOrder: params.sortOrder })
+        });
+      }
+    } catch (error) {
+      console.error('Fetch error:', error);
+      updateState({ error: error.message, loading: false });
     }
-  } catch (error) {
-    console.error('Fetch error:', error);
-    updateState({
-      error: error.message,
-      loading: false
-    });
-  }
-}, [state.page, state.rowsPerPage, state.sortBy, state.sortOrder, state.searchTerm, state.filters]);
+  }, [state.page, state.rowsPerPage, state.sortBy, state.sortOrder, state.searchTerm, state.filters]);
+  
 
   // Fetch Reviews
   const fetchReviews = useCallback(async (productId) => {
@@ -513,12 +514,16 @@ const ProductDisplay = () => {
   // Debounced Search
   const debouncedSearch = useCallback(
     debounce((term) => {
-      updateState({ searchTerm: term, page: 0 });
-      fetchProducts({ page: 0 });
-    }, 500),
-    [fetchProducts]
+      console.log('Searching for:', term);
+      fetchProducts({ 
+        page: 0,
+        search: term,
+        sortBy: state.sortBy,
+        sortOrder: state.sortOrder 
+      });
+    }, 300),
+    [state.sortBy, state.sortOrder]
   );
-
   // Initial Fetch
   useEffect(() => {
     fetchProducts();
@@ -546,20 +551,28 @@ const ProductDisplay = () => {
 
   // Other Handlers
   const handleSort = (event) => {
-    const newSortBy = event.target.value;
-    console.log('Sorting by:', newSortBy);
+    const value = event.target.value;
+    console.log('Sorting by:', value);
     
-    updateState({
-      sortBy: newSortBy,
-      page: 0
-    });
+    const isDesc = value.startsWith('-');
+    const sortField = isDesc ? value.substring(1) : value;
+    const sortOrder = isDesc ? 'desc' : 'asc';
   
     fetchProducts({
       page: 0,
-      sort: newSortBy,
-      order: state.sortOrder
+      sortBy: sortField,
+      sortOrder: sortOrder
     });
   };
+  
+  useEffect(() => {
+    console.log('Initial fetch with state:', {
+      page: state.page,
+      sortBy: state.sortBy,
+      sortOrder: state.sortOrder
+    });
+    fetchProducts();
+  }, [fetchProducts]);
 
   const handleOpenReviews = useCallback(async (product) => {
     console.log('Opening reviews for product:', product._id);
@@ -695,7 +708,7 @@ const ProductDisplay = () => {
                         Sort By
                       </InputLabel>
                       <Select
-  value={state.sortBy}
+  value={state.sortBy} // This should match exactly with MenuItem values
   onChange={handleSort}
   label="Sort By"
 >
